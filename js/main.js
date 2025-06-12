@@ -28,15 +28,52 @@ const fileUploadArea = document.querySelector(".file-upload");
 uploadButton.addEventListener("click", () => fileInput.click());
 fileInput.addEventListener("change", handleFileUpload);
 searchButton.addEventListener("click", performSearch);
+
+// Handle textarea height adjustment with Shift+Enter
 searchInput.addEventListener("keydown", (e) => {
-    if (e.key === "Enter" && !e.shiftKey) {
-        e.preventDefault();
-        performSearch();
+    if (e.key === "Enter") {
+        if (e.shiftKey) {
+            // Allow the default behavior (add a new line)
+            adjustTextareaHeight(e.target);
+        } else {
+            e.preventDefault();
+            performSearch();
+        }
     }
 });
+
+fullscreenSearchInput.addEventListener("keydown", (e) => {
+    if (e.key === "Enter") {
+        if (e.shiftKey) {
+            // Allow the default behavior (add a new line)
+            adjustTextareaHeight(e.target);
+        } else {
+            e.preventDefault();
+            performSearch(true);
+        }
+    }
+});
+
+// Function to adjust textarea height based on content
+function adjustTextareaHeight(textarea) {
+    // Use setTimeout to ensure the new line is added before measuring height
+    setTimeout(() => {
+        textarea.style.height = "auto";
+        textarea.style.height = textarea.scrollHeight + "px";
+    }, 0);
+}
+
+// Initialize textarea height adjustment on input
+searchInput.addEventListener("input", () => adjustTextareaHeight(searchInput));
+fullscreenSearchInput.addEventListener("input", () =>
+    adjustTextareaHeight(fullscreenSearchInput)
+);
 clearInputBtn.addEventListener("click", () => {
     searchInput.value = "";
     fullscreenSearchInput.value = "";
+    // Reset textarea heights
+    searchInput.style.height = "";
+    fullscreenSearchInput.style.height = "";
     if (uploadedFiles.length > 0) {
         showAllData();
     } else {
@@ -477,6 +514,10 @@ function updateEmptyState() {
 
 // Initialize
 updateFileList();
+
+// Set initial heights for textareas
+adjustTextareaHeight(searchInput);
+adjustTextareaHeight(fullscreenSearchInput);
 
 // Demo data for initial display
 setTimeout(() => {
