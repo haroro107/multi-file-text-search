@@ -32,11 +32,20 @@
                     <h2><i class="fas fa-search"></i> Search Content</h2>
                     <div class="search-container">
                         <textarea id="search-input" placeholder="Enter search terms, one per line"></textarea>
-                        <select id="search-mode" title="Search Mode">
-                            <option value="or">OR</option>
-                            <option value="and">AND</option>
-                            <option value="not">NOT</option>
-                        </select>
+                        <div id="search-mode" class="search-mode-group">
+                            <label class="search-mode-btn">
+                                <input type="radio" name="search-mode" value="or" checked>
+                                <span>OR</span>
+                            </label>
+                            <label class="search-mode-btn">
+                                <input type="radio" name="search-mode" value="and">
+                                <span>AND</span>
+                            </label>
+                            <label class="search-mode-btn">
+                                <input type="radio" name="search-mode" value="not">
+                                <span>NOT</span>
+                            </label>
+                        </div>
                         <button id="search-btn">Search</button>
                     </div>
                 </div>
@@ -46,11 +55,20 @@
                 <!-- Fullscreen search bar (hidden by default) -->
                 <div class="fullscreen-search-bar" id="fullscreen-search-bar">
                     <textarea id="fullscreen-search-input" placeholder="Enter search terms, one per line"></textarea>
-                    <select id="fullscreen-search-mode" title="Search Mode">
-                        <option value="or">OR</option>
-                        <option value="and">AND</option>
-                        <option value="not">NOT</option>
-                    </select>
+                    <div id="fullscreen-search-mode" class="search-mode-group">
+                        <label class="search-mode-btn">
+                            <input type="radio" name="fullscreen-search-mode" value="or" checked>
+                            <span>OR</span>
+                        </label>
+                        <label class="search-mode-btn">
+                            <input type="radio" name="fullscreen-search-mode" value="and">
+                            <span>AND</span>
+                        </label>
+                        <label class="search-mode-btn">
+                            <input type="radio" name="fullscreen-search-mode" value="not">
+                            <span>NOT</span>
+                        </label>
+                    </div>
                     <button id="fullscreen-search-btn"><i class="fas fa-search"></i></button>
                 </div>
                 <div class="results-header">

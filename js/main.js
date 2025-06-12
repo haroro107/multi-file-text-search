@@ -247,20 +247,24 @@ function performSearch(isFullscreen = false) {
             .split("\n")
             .map((t) => t.trim())
             .filter(Boolean);
-        mode = fullscreenSearchMode.value;
+        // Get selected radio button value for fullscreen
+        mode = document.querySelector('input[name="fullscreen-search-mode"]:checked').value;
         // Sync value to main search input
         searchInput.value = rawInput;
-        searchMode.value = mode;
+        // Sync radio button selection
+        document.querySelector(`input[name="search-mode"][value="${mode}"]`).checked = true;
     } else {
         rawInput = searchInput.value.trim();
         searchTerms = rawInput
             .split("\n")
             .map((t) => t.trim())
             .filter(Boolean);
-        mode = searchMode.value;
+        // Get selected radio button value 
+        mode = document.querySelector('input[name="search-mode"]:checked').value;
         // Sync value to fullscreen search input
         fullscreenSearchInput.value = rawInput;
-        fullscreenSearchMode.value = mode;
+        // Sync radio button selection
+        document.querySelector(`input[name="fullscreen-search-mode"][value="${mode}"]`).checked = true;
     }
 
     if (searchTerms.length === 0) {
