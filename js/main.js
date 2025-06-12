@@ -29,6 +29,15 @@ uploadButton.addEventListener("click", () => fileInput.click());
 fileInput.addEventListener("change", handleFileUpload);
 searchButton.addEventListener("click", performSearch);
 
+// Add event listeners for radio button changes
+document.querySelectorAll('input[name="search-mode"]').forEach(radio => {
+    radio.addEventListener('change', () => performSearch());
+});
+
+document.querySelectorAll('input[name="fullscreen-search-mode"]').forEach(radio => {
+    radio.addEventListener('change', () => performSearch(true));
+});
+
 // Handle textarea height adjustment with Shift+Enter
 searchInput.addEventListener("keydown", (e) => {
     if (e.key === "Enter") {
