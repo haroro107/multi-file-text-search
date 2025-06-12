@@ -1,0 +1,1079 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Text File Search Tool</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+        }
+
+        body {
+            background: #232526;
+            min-height: 100vh;
+            padding: 32px;
+            color: #f5f5f5;
+            font-size: 1.08rem;
+        }
+
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+
+        header {
+            text-align: center;
+            padding: 36px 0 24px 0;
+            margin-bottom: 32px;
+        }
+
+        h1 {
+            font-size: 2.4rem;
+            margin-bottom: 8px;
+            text-shadow: 0 2px 4px rgba(0,0,0,0.18);
+            color: #2196f3;
+            font-weight: 700;
+            letter-spacing: 0.5px;
+        }
+
+        .description {
+            font-size: 1.12rem;
+            max-width: 800px;
+            margin: 0 auto 18px;
+            line-height: 1.7;
+            color: #cfd8dc;
+        }
+
+        .app-container {
+            background: #23272f;
+            border-radius: 0;
+            box-shadow: 0 6px 24px rgba(0,0,0,0.18), 0 1.5px 4px rgba(0,0,0,0.10);
+            overflow: hidden;
+            margin-bottom: 36px;
+        }
+
+        .panel {
+            padding: 32px 32px 18px 32px;
+        }
+
+        .upload-section, .search-section {
+            margin-bottom: 32px;
+        }
+
+        h2 {
+            font-size: 1.35rem;
+            margin-bottom: 16px;
+            color: #2196f3;
+            display: flex;
+            align-items: center;
+            font-weight: 600;
+            letter-spacing: 0.2px;
+        }
+
+        h2 i {
+            margin-right: 10px;
+            font-size: 1.2rem;
+        }
+
+        .file-upload {
+            background: #262b33;
+            border: 2px solid #90caf9;
+            border-radius: 0;
+            padding: 22px 18px;
+            text-align: center;
+            transition: all 0.3s;
+            margin-bottom: 18px;
+            box-shadow: 0 2px 8px rgba(33,147,176,0.08);
+        }
+        .file-upload.dragover {
+            background: #e3f2fd;
+            border-color: #2196f3;
+        }
+
+        .file-upload p {
+            margin-bottom: 12px;
+            color: #b0bec5;
+            font-size: 1rem;
+        }
+
+        .upload-btn {
+            background: #2196f3;
+            color: white;
+            border: none;
+            padding: 10px 28px;
+            font-size: 1rem;
+            border-radius: 0;
+            cursor: pointer;
+            transition: all 0.3s;
+            display: inline-flex;
+            align-items: center;
+            box-shadow: 0 2px 8px rgba(33,147,176,0.12);
+            font-weight: 500;
+            letter-spacing: 0.1px;
+        }
+
+        .upload-btn:hover {
+            background: #1976d2;
+            color: #fff;
+            transform: translateY(-2px) scale(1.03);
+            box-shadow: 0 6px 18px rgba(33,147,176,0.18);
+        }
+
+        .upload-btn i {
+            margin-right: 7px;
+        }
+
+        #file-input {
+            display: none;
+        }
+
+        .search-container {
+            display: flex;
+            gap: 18px;
+            align-items: flex-start;
+            background: #23272f;
+            border-radius: 0;
+            box-shadow: 0 2px 8px rgba(79,195,247,0.10);
+            padding: 18px 18px 18px 18px;
+            margin-bottom: 12px;
+            transition: box-shadow 0.3s;
+            align-items: center;
+        }
+        .search-container:focus-within {
+            box-shadow: 0 8px 32px rgba(79,195,247,0.18);
+        }
+        #search-input {
+            flex: 1;
+            padding: 13px 18px;
+            border: none;
+            border-radius: 0;
+            background: #262b33;
+            color: #f5f5f5;
+            font-size: 1rem;
+            outline: none;
+            transition: background 0.3s, box-shadow 0.3s;
+            resize: vertical;
+            min-height: 44px;
+            max-height: 110px;
+            box-shadow: 0 2px 8px rgba(79,195,247,0.06);
+            font-family: inherit;
+        }
+        #search-input:focus {
+            background: #283142;
+            box-shadow: 0 0 0 3px rgba(79, 195, 247, 0.13);
+        }
+        #search-mode {
+            padding: 10px 18px;
+            border-radius: 0;
+            border: 2px solid #2196f3;
+            background: #23272f;
+            color: #2196f3;
+            font-size: 1rem;
+            margin-top: 0;
+            margin-bottom: 0;
+            transition: border 0.2s, background 0.2s;
+            box-shadow: 0 2px 8px rgba(79,195,247,0.04);
+            font-weight: 500;
+        }
+        #search-mode:focus {
+            border: 2px solid #1976d2;
+            background: #283142;
+            outline: none;
+        }
+
+        #search-btn {
+            background: #ff7043;
+            color: white;
+            border: none;
+            padding: 0 28px;
+            font-size: 1rem;
+            border-radius: 0;
+            cursor: pointer;
+            transition: all 0.3s;
+            display: flex;
+            align-items: center;
+            min-height: 44px;
+            box-shadow: 0 2px 8px rgba(255,112,67,0.08);
+            font-weight: 500;
+            letter-spacing: 0.1px;
+        }
+
+        #search-btn:hover, #search-btn:focus {
+            background: #e64a19;
+            color: #fff;
+            transform: translateY(-2px) scale(1.04);
+            box-shadow: 0 6px 18px rgba(255,112,67,0.18);
+            outline: none;
+        }
+
+        .results-section {
+            background: #23272f;
+            border-radius: 0;
+            padding: 28px 32px;
+            min-height: 300px;
+            box-shadow: 0 6px 24px rgba(0,0,0,0.18), 0 1.5px 4px rgba(0,0,0,0.10);
+        }
+
+        .results-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 18px;
+            gap: 12px;
+        }
+
+        #results-count {
+            font-size: 1.08rem;
+            color: #26c6da;
+            font-weight: 500;
+        }
+
+        #results-container {
+            max-height: 500px;
+            overflow-y: auto;
+            padding-right: 8px;
+        }
+
+        .file-result {
+            margin-bottom: 22px;
+            background: #263238;
+            border-radius: 0;
+            overflow: hidden;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.13);
+            display: flex;
+            flex-direction: column;
+        }
+
+        .file-header {
+            background: #37474f;
+            padding: 10px 18px;
+            font-weight: 600;
+            color: #2196f3;
+            border-bottom: 2px solid #2196f3;
+            cursor: pointer;
+            user-select: none;
+            transition: background 0.2s;
+            font-size: 1rem;
+            letter-spacing: 0.1px;
+        }
+        .file-header:hover {
+            background: #455a64;
+        }
+        .file-header .collapse-icon {
+            float: right;
+            font-size: 1.1em;
+            margin-left: 8px;
+            transition: transform 0.2s;
+        }
+        .file-header.collapsed .collapse-icon {
+            transform: rotate(-90deg);
+        }
+        .file-content.collapsed {
+            display: none;
+        }
+
+        .file-content {
+            padding: 12px 18px;
+        }
+
+        .file-content.fullscreen {
+            flex: 1 1 auto;
+            min-height: 0;
+            max-height: 100%;
+            overflow: auto;
+        }
+
+        .file-entry {
+            padding: 10px 12px;
+            margin: 7px 0;
+            background: #23272f;
+            border-radius: 0;
+            font-family: 'Courier New', monospace;
+            color: #ececec;
+            transition: all 0.2s;
+            font-size: 0.98rem;
+        }
+
+        .file-entry:hover {
+            background: #283142;
+            transform: translateX(4px);
+        }
+
+        .highlight {
+            background-color: #fffde7;
+            color: #ffb300;
+            padding: 0 2px;
+            border-radius: 0;
+        }
+
+        .empty-state {
+            text-align: center;
+            padding: 36px 18px;
+            color: #b0bec5;
+            font-size: 1.08rem;
+        }
+
+        .empty-state i {
+            font-size: 3.2rem;
+            margin-bottom: 16px;
+            opacity: 0.25;
+        }
+
+        .empty-state h3 {
+            font-size: 1.18rem;
+            margin-bottom: 8px;
+            color: #b0bec5;
+            font-weight: 500;
+        }
+
+        footer {
+            text-align: center;
+            padding: 18px;
+            color: #b0bec5;
+            font-size: 0.95rem;
+        }
+
+        @media (max-width: 768px) {
+            .search-container {
+                flex-direction: column;
+            }
+            #search-btn {
+                justify-content: center;
+                padding: 13px;
+            }
+            h1 {
+                font-size: 1.6rem;
+            }
+            .panel {
+                padding: 18px 8px 8px 8px;
+            }
+            .results-section {
+                padding: 18px 8px;
+            }
+        }
+
+        .fullscreen-btn {
+            background: #23272f;
+            color: #2196f3;
+            border: 2px solid #2196f3;
+            padding: 8px 18px;
+            border-radius: 0;
+            cursor: pointer;
+            transition: all 0.3s;
+            margin-left: 8px;
+            box-shadow: 0 1.5px 4px rgba(79,195,247,0.08);
+            font-weight: 500;
+        }
+
+        .fullscreen-btn:hover {
+            background: #283142;
+            color: #1976d2;
+        }
+
+        .results-section.fullscreen {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100vw;
+            height: 100vh;
+            z-index: 9999;
+            background: #23272f;
+            border-radius: 0;
+            box-shadow: none;
+            padding: 40px 10vw 40px 10vw;
+            overflow-y: auto;
+            display: flex;
+            flex-direction: column;
+        }
+        .results-section.fullscreen #results-container {
+            flex: 1 1 auto;
+            max-height: none;
+            padding-right: 0;
+            overflow: visible;
+            display: flex;
+            flex-direction: column;
+        }
+        .fullscreen-search-bar {
+            display: none;
+            margin-bottom: 18px;
+            gap: 10px;
+            align-items: center;
+        }
+        .fullscreen-search-bar.visible {
+            display: flex;
+        }
+        .fullscreen-search-bar input,
+        .fullscreen-search-bar textarea {
+            flex: 1;
+            padding: 10px 14px;
+            border-radius: 0;
+            border: none;
+            font-size: 1rem;
+            background: #262b33;
+            color: #fff;
+            outline: none;
+        }
+        .fullscreen-search-bar button {
+            background: #2196f3;
+            color: white;
+            border: none;
+            padding: 0 18px;
+            font-size: 1rem;
+            border-radius: 0;
+            cursor: pointer;
+            min-height: 38px;
+            box-shadow: 0 1.5px 4px rgba(33,147,176,0.10);
+            font-weight: 500;
+            transition: background 0.2s;
+        }
+        .fullscreen-search-bar button:hover {
+            background: #1976d2;
+        }
+        .fullscreen-search-toggle-btn {
+            background: #23272f;
+            color: #2196f3;
+            border: 2px solid #2196f3;
+            padding: 8px 14px;
+            border-radius: 0;
+            cursor: pointer;
+            margin-right: 8px;
+            transition: all 0.3s;
+            box-shadow: 0 1.5px 4px rgba(79,195,247,0.08);
+            font-weight: 500;
+        }
+        .fullscreen-search-toggle-btn:hover {
+            background: #283142;
+            color: #1976d2;
+        }
+        .fullscreen-search-bar select {
+            padding: 10px 18px;
+            border-radius: 0;
+            border: 2px solid #2196f3;
+            background: #23272f;
+            color: #2196f3;
+            font-size: 1rem;
+            margin: 0 8px 0 0;
+            transition: border 0.2s, background 0.2s;
+            box-shadow: 0 2px 8px rgba(79,195,247,0.04);
+            outline: none;
+            min-width: 80px;
+            appearance: none;
+            -webkit-appearance: none;
+            -moz-appearance: none;
+            font-weight: 500;
+        }
+        .fullscreen-search-bar select:focus {
+            border: 2px solid #1976d2;
+            background: #283142;
+        }
+
+        #clear-input-btn {
+            color: #2196f3;
+            cursor: pointer;
+            font-weight: 500;
+            font-size: 1em;
+            user-select: none;
+            background: none;
+            border: none;
+            padding: 0;
+            transition: color 0.2s, text-decoration 0.2s;
+            text-decoration: underline dotted 1.5px transparent;
+        }
+        #clear-input-btn:hover {
+            color: #1976d2;
+            text-decoration: underline solid 1.5px #1976d2;
+        }
+    </style>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>Text File Search Tool</h1>
+            <p class="description">Upload multiple text files containing file paths and search through their contents. The application will display matching entries grouped by source file.</p>
+        </header>
+
+        <div class="app-container">
+            <div class="panel">
+                <div class="upload-section">
+                    <h2><i class="fas fa-file-upload"></i> Upload Text Files</h2>
+                    <div class="file-upload">
+                        <p>Drag & drop your text files here or click to browse</p>
+                        <button class="upload-btn" id="upload-button">
+                            <i class="fas fa-cloud-upload-alt"></i> Choose Files
+                        </button>
+                        <input type="file" id="file-input" accept=".txt" multiple>
+                    </div>
+                    <div id="file-list"></div>
+                </div>
+
+                <div class="search-section">
+                    <h2><i class="fas fa-search"></i> Search Content</h2>
+                    <div class="search-container">
+                        <textarea id="search-input" placeholder="Enter search terms, one per line"></textarea>
+                        <select id="search-mode" title="Search Mode">
+                            <option value="or">OR</option>
+                            <option value="and">AND</option>
+                            <option value="not">NOT</option>
+                        </select>
+                        <button id="search-btn">Search</button>
+                    </div>
+                </div>
+            </div>
+
+            <div class="results-section">
+                <!-- Fullscreen search bar (hidden by default) -->
+                <div class="fullscreen-search-bar" id="fullscreen-search-bar">
+                    <textarea id="fullscreen-search-input" placeholder="Enter search terms, one per line"></textarea>
+                    <select id="fullscreen-search-mode" title="Search Mode">
+                        <option value="or">OR</option>
+                        <option value="and">AND</option>
+                        <option value="not">NOT</option>
+                    </select>
+                    <button id="fullscreen-search-btn"><i class="fas fa-search"></i></button>
+                </div>
+                <div class="results-header">
+                    <div id="results-count">Results: 0</div>
+                    <div style="display: flex; gap: 10px; align-items: center;">
+                        <button class="fullscreen-search-toggle-btn" id="fullscreen-search-toggle-btn" title="Show/Hide Search in Fullscreen" style="display:none;">
+                            <i class="fas fa-search"></i> Search
+                        </button>
+                        <span id="clear-input-btn" style="color:#42a5f5;cursor:pointer;font-weight:500;font-size:1em;user-select:none;background:none;border:none;padding:0;transition:color 0.2s;text-decoration:underline dotted 1.5px transparent;">Clear Input Text</span>
+                        <button class="fullscreen-btn" id="fullscreen-btn" title="Toggle Full Screen">
+                            <i class="fas fa-expand"></i> Full Screen
+                        </button>
+                    </div>
+                </div>
+                <div id="results-container">
+                    <div class="empty-state">
+                        <i class="fas fa-file-alt"></i>
+                        <h3>No Files Uploaded</h3>
+                        <p>Upload text files to begin searching</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <footer>
+            <p>Upload multiple text files and search through their content. Matching results will be grouped by source file.</p>
+        </footer>
+    </div>
+
+    <script>
+        // Store uploaded files data
+        let uploadedFiles = [];
+
+        // DOM elements
+        const fileInput = document.getElementById('file-input');
+        const uploadButton = document.getElementById('upload-button');
+        const fileList = document.getElementById('file-list');
+        const searchInput = document.getElementById('search-input');
+        const searchButton = document.getElementById('search-btn');
+        const searchMode = document.getElementById('search-mode');
+        const resultsContainer = document.getElementById('results-container');
+        const resultsCount = document.getElementById('results-count');
+        const clearInputBtn = document.getElementById('clear-input-btn');
+        const resultsSection = document.querySelector('.results-section');
+        const fullscreenBtn = document.getElementById('fullscreen-btn');
+        const fullscreenSearchBar = document.getElementById('fullscreen-search-bar');
+        const fullscreenSearchInput = document.getElementById('fullscreen-search-input');
+        const fullscreenSearchBtn = document.getElementById('fullscreen-search-btn');
+        const fullscreenSearchMode = document.getElementById('fullscreen-search-mode');
+        const fullscreenSearchToggleBtn = document.getElementById('fullscreen-search-toggle-btn');
+        const fileUploadArea = document.querySelector('.file-upload');
+
+        // Setup event listeners
+        uploadButton.addEventListener('click', () => fileInput.click());
+        fileInput.addEventListener('change', handleFileUpload);
+        searchButton.addEventListener('click', performSearch);
+        searchInput.addEventListener('keydown', (e) => {
+            if (e.key === 'Enter' && !e.shiftKey) {
+                e.preventDefault();
+                performSearch();
+            }
+        });
+        clearInputBtn.addEventListener('click', () => {
+            searchInput.value = '';
+            fullscreenSearchInput.value = '';
+            if (uploadedFiles.length > 0) {
+                showAllData();
+            } else {
+                resultsContainer.innerHTML = `
+                    <div class="empty-state">
+                        <i class="fas fa-file-alt"></i>
+                        <h3>No Files Uploaded</h3>
+                        <p>Upload text files to begin searching</p>
+                    </div>
+                `;
+                resultsCount.textContent = 'Results: 0';
+            }
+        });
+
+        // Show/hide fullscreen search bar
+        fullscreenSearchToggleBtn.addEventListener('click', () => {
+            fullscreenSearchBar.classList.toggle('visible');
+            if (fullscreenSearchBar.classList.contains('visible')) {
+                fullscreenSearchInput.focus();
+            }
+        });
+
+        // Fullscreen search event
+        fullscreenSearchBtn.addEventListener('click', () => {
+            performSearch(true);
+        });
+        fullscreenSearchInput.addEventListener('keydown', (e) => {
+            if (e.key === 'Enter' && !e.shiftKey) {
+                e.preventDefault();
+                performSearch(true);
+            }
+        });
+
+        // Full screen toggle
+        fullscreenBtn.addEventListener('click', () => {
+            resultsSection.classList.toggle('fullscreen');
+            // Toggle .fullscreen on all .file-content elements
+            document.querySelectorAll('.file-content').forEach(el => {
+                if (resultsSection.classList.contains('fullscreen')) {
+                    el.classList.add('fullscreen');
+                } else {
+                    el.classList.remove('fullscreen');
+                }
+            });
+            // Toggle fullscreen search toggle button
+            if (resultsSection.classList.contains('fullscreen')) {
+                fullscreenBtn.innerHTML = '<i class="fas fa-compress"></i> Exit Full Screen';
+                fullscreenSearchToggleBtn.style.display = '';
+            } else {
+                fullscreenBtn.innerHTML = '<i class="fas fa-expand"></i> Full Screen';
+                fullscreenSearchToggleBtn.style.display = 'none';
+                fullscreenSearchBar.classList.remove('visible');
+            }
+        });
+
+        // Handle file upload
+        function handleFileUpload(e) {
+            const files = Array.from(e.target.files);
+
+            if (files.length === 0) return;
+
+            files.forEach(file => {
+                if (file.type !== 'text/plain') {
+                    alert('Please upload only text files (.txt)');
+                    return;
+                }
+
+                const reader = new FileReader();
+                reader.onload = function(event) {
+                    const content = event.target.result;
+                    const fileName = file.name;
+                    // Use a unique key for each file: name + size + lastModified
+                    const uniqueKey = `${file.name}_${file.size}_${file.lastModified}`;
+
+                    // Check if file is already uploaded (by uniqueKey)
+                    if (uploadedFiles.some(f => f.uniqueKey === uniqueKey)) {
+                        alert(`File "${fileName}" is already uploaded`);
+                        return;
+                    }
+
+                    // Store file content with uniqueKey
+                    uploadedFiles.push({
+                        name: fileName,
+                        uniqueKey: uniqueKey,
+                        content: content,
+                        lines: content.split('\n').filter(line => line.trim() !== '')
+                    });
+
+                    // Update UI
+                    updateFileList();
+                    updateEmptyState();
+
+                    // If search input is empty, show all data
+                    if (!searchInput.value.trim()) {
+                        showAllData();
+                    }
+                };
+                reader.readAsText(file);
+            });
+
+            // Reset input to allow uploading same file again
+            fileInput.value = '';
+        }
+
+        // Update the file list display
+        function updateFileList() {
+            if (uploadedFiles.length === 0) {
+                fileList.innerHTML = '<p>No files uploaded yet</p>';
+                return;
+            }
+
+            fileList.innerHTML = `
+                <div class="file-list-header" style="display:flex;align-items:center;justify-content:space-between;">
+                    <span><strong>Uploaded Files:</strong> (${uploadedFiles.length})</span>
+                    <span id="clear-files-link" style="color:#ff7043;cursor:pointer;font-weight:500;font-size:1em;user-select:none;">Clear All Files</span>
+                </div>
+            `;
+
+            // Add event for clear all files link
+            setTimeout(() => {
+                const clearFilesLink = document.getElementById('clear-files-link');
+                if (clearFilesLink) {
+                    clearFilesLink.onclick = clearAllFiles;
+                }
+            }, 0);
+
+            uploadedFiles.forEach((file, idx) => {
+                const fileItem = document.createElement('div');
+                fileItem.className = 'file-item';
+                // Add remove button for each file
+                fileItem.innerHTML = `
+                    <i class="fas fa-file-alt"></i> ${file.name} (${file.lines.length} entries)
+                    <button class="remove-file-btn" title="Remove file" style="margin-left:12px; color:#ff7043; background:none; border:none; cursor:pointer; font-size:1.1em;">
+                        <i class="fas fa-times"></i>
+                    </button>
+                `;
+                // Remove file on button click
+                fileItem.querySelector('.remove-file-btn').onclick = function() {
+                    uploadedFiles.splice(idx, 1);
+                    updateFileList();
+                    if (uploadedFiles.length === 0) {
+                        resultsContainer.innerHTML = `
+                            <div class="empty-state">
+                                <i class="fas fa-file-alt"></i>
+                                <h3>No Files Uploaded</h3>
+                                <p>Upload text files to begin searching</p>
+                            </div>
+                        `;
+                        resultsCount.textContent = 'Results: 0';
+                        searchInput.value = '';
+                    } else {
+                        // If search input is empty, show all data; else, re-search
+                        if (!searchInput.value.trim()) {
+                            showAllData();
+                        } else {
+                            performSearch();
+                        }
+                    }
+                };
+                fileList.appendChild(fileItem);
+            });
+        }
+
+        // Perform search (normal or fullscreen)
+        function performSearch(isFullscreen = false) {
+            let rawInput, searchTerms, mode;
+            if (isFullscreen && resultsSection.classList.contains('fullscreen')) {
+                rawInput = fullscreenSearchInput.value.trim();
+                searchTerms = rawInput.split('\n').map(t => t.trim()).filter(Boolean);
+                mode = fullscreenSearchMode.value;
+                // Sync value to main search input
+                searchInput.value = rawInput;
+                searchMode.value = mode;
+            } else {
+                rawInput = searchInput.value.trim();
+                searchTerms = rawInput.split('\n').map(t => t.trim()).filter(Boolean);
+                mode = searchMode.value;
+                // Sync value to fullscreen search input
+                fullscreenSearchInput.value = rawInput;
+                fullscreenSearchMode.value = mode;
+            }
+
+            if (searchTerms.length === 0) {
+                // If no search terms, show all data if files uploaded
+                if (uploadedFiles.length > 0) {
+                    showAllData();
+                } else {
+                    alert('Please enter at least one search term');
+                }
+                return;
+            }
+            if (uploadedFiles.length === 0) {
+                alert('Please upload some text files first');
+                return;
+            }
+
+            let totalResults = 0;
+            resultsContainer.innerHTML = '';
+
+            // Track which terms are found in any file
+            let foundTermsGlobal = new Set();
+
+            uploadedFiles.forEach(file => {
+                let matchingLines = [];
+                if (mode === 'or') {
+                    matchingLines = file.lines.filter(line =>
+                        searchTerms.some(term =>
+                            line.toLowerCase().includes(term.toLowerCase())
+                        )
+                    );
+                } else if (mode === 'and') {
+                    matchingLines = file.lines.filter(line =>
+                        searchTerms.every(term =>
+                            line.toLowerCase().includes(term.toLowerCase())
+                        )
+                    );
+                } else if (mode === 'not') {
+                    matchingLines = file.lines.filter(line =>
+                        searchTerms.every(term =>
+                            !line.toLowerCase().includes(term.toLowerCase())
+                        )
+                    );
+                }
+
+                const fileResult = document.createElement('div');
+                fileResult.className = 'file-result';
+
+                const header = document.createElement('div');
+                header.className = 'file-header';
+                header.innerHTML = `from ${file.name}`;
+
+                const content = document.createElement('div');
+                content.className = 'file-content';
+                if (resultsSection.classList.contains('fullscreen')) {
+                    content.classList.add('fullscreen');
+                }
+
+                if (matchingLines.length > 0) {
+                    totalResults += matchingLines.length;
+                    matchingLines.forEach(line => {
+                        const entry = document.createElement('div');
+                        entry.className = 'file-entry';
+
+                        // Highlight all search terms
+                        let highlightedLine = line;
+                        searchTerms.forEach(term => {
+                            if (term) {
+                                const regex = new RegExp(term.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'gi');
+                                highlightedLine = highlightedLine.replace(regex, match =>
+                                    `<span class="highlight">${match}</span>`
+                                );
+                            }
+                        });
+
+                        entry.innerHTML = highlightedLine;
+                        content.appendChild(entry);
+                    });
+                }
+
+                // For OR mode, show "not found" for each search term not found in this file
+                if (mode === 'or') {
+                    const foundTerms = new Set();
+                    matchingLines.forEach(line => {
+                        searchTerms.forEach(term => {
+                            if (line.toLowerCase().includes(term.toLowerCase())) {
+                                foundTerms.add(term.toLowerCase());
+                                foundTermsGlobal.add(term.toLowerCase());
+                            }
+                        });
+                    });
+                    const notFoundTerms = searchTerms.filter(term => !foundTerms.has(term.toLowerCase()));
+                    if (notFoundTerms.length > 0) {
+                        notFoundTerms.forEach(term => {
+                            const entry = document.createElement('div');
+                            entry.className = 'file-entry';
+                            entry.style.opacity = '0.6';
+                            entry.style.fontStyle = 'italic';
+                            entry.innerHTML = `<span class="highlight">${term}</span> <span style="color:#ff5e62;">not found</span>`;
+                            content.appendChild(entry);
+                        });
+                    }
+                }
+                // For NOT mode, show "excluded" for each search term
+                if (mode === 'not' && searchTerms.length > 0) {
+                    const entry = document.createElement('div');
+                    entry.className = 'file-entry';
+                    entry.style.opacity = '0.6';
+                    entry.style.fontStyle = 'italic';
+                    entry.innerHTML = `<span class="highlight">${searchTerms.join(', ')}</span> <span style="color:#ff5e62;">excluded</span>`;
+                    content.appendChild(entry);
+                }
+
+                if (matchingLines.length > 0 || (mode === 'or' && content.childNodes.length > 0)) {
+                    fileResult.appendChild(header);
+                    fileResult.appendChild(content);
+                    resultsContainer.appendChild(fileResult);
+                }
+            });
+
+            // Show global not found summary at the bottom (for OR mode)
+            if (mode === 'or' && searchTerms.length > 0) {
+                const notFoundGlobal = searchTerms.filter(
+                    term => !foundTermsGlobal.has(term.toLowerCase())
+                );
+                if (notFoundGlobal.length > 0) {
+                    const summary = document.createElement('div');
+                    summary.className = 'empty-state';
+                    summary.style.marginTop = '32px';
+                    summary.innerHTML = `
+                        <i class="fas fa-exclamation-circle"></i>
+                        <h3>Not Found In Any File</h3>
+                        <p>
+                            ${notFoundGlobal.map(term => `<span class="highlight">${term}</span>`).join(', ')}
+                        </p>
+                    `;
+                    resultsContainer.appendChild(summary);
+                }
+            }
+
+            if (totalResults === 0) {
+                resultsContainer.innerHTML = `
+                    <div class="empty-state">
+                        <i class="fas fa-search"></i>
+                        <h3>No Results Found</h3>
+                        <p>No entries match your search term${searchTerms.length > 1 ? 's' : ''}${searchTerms.length ? ` "${searchTerms.join(', ')}"` : ''}</p>
+                    </div>
+                `;
+            }
+
+            resultsCount.textContent = `Results: ${totalResults}`;
+
+            // Make collapsible after rendering
+            makeFileResultsCollapsible();
+        }
+
+        // Show all data grouped by file
+        function showAllData() {
+            resultsContainer.innerHTML = '';
+            let totalResults = 0;
+            uploadedFiles.forEach(file => {
+                if (file.lines.length === 0) return;
+                const fileResult = document.createElement('div');
+                fileResult.className = 'file-result';
+
+                const header = document.createElement('div');
+                header.className = 'file-header';
+                header.innerHTML = `from ${file.name}`;
+
+                const content = document.createElement('div');
+                content.className = 'file-content';
+                if (resultsSection.classList.contains('fullscreen')) {
+                    content.classList.add('fullscreen');
+                }
+
+                file.lines.forEach(line => {
+                    const entry = document.createElement('div');
+                    entry.className = 'file-entry';
+                    entry.textContent = line;
+                    content.appendChild(entry);
+                });
+
+                fileResult.appendChild(header);
+                fileResult.appendChild(content);
+                resultsContainer.appendChild(fileResult);
+                totalResults += file.lines.length;
+            });
+
+            if (totalResults === 0) {
+                resultsContainer.innerHTML = `
+                    <div class="empty-state">
+                        <i class="fas fa-file-alt"></i>
+                        <h3>No Data</h3>
+                        <p>No entries to display</p>
+                    </div>
+                `;
+            }
+            resultsCount.textContent = `Results: ${totalResults}`;
+
+            // Make collapsible after rendering
+            makeFileResultsCollapsible();
+        }
+
+        // Clear all uploaded files
+        function clearAllFiles() {
+            uploadedFiles = [];
+            updateFileList();
+            resultsContainer.innerHTML = `
+                <div class="empty-state">
+                    <i class="fas fa-file-alt"></i>
+                    <h3>No Files Uploaded</h3>
+                    <p>Upload text files to begin searching</p>
+                </div>
+            `;
+            resultsCount.textContent = 'Results: 0';
+            searchInput.value = '';
+        }
+
+        // Update empty state
+        function updateEmptyState() {
+            if (uploadedFiles.length > 0) {
+                resultsContainer.innerHTML = `
+                    <div class="empty-state">
+                        <i class="fas fa-search"></i>
+                        <h3>Ready to Search</h3>
+                        <p>Enter a search term to find matching entries</p>
+                    </div>
+                `;
+                resultsCount.textContent = 'Results: 0';
+            }
+        }
+
+        // Initialize
+        updateFileList();
+
+        // Demo data for initial display
+        setTimeout(() => {
+            if (uploadedFiles.length === 0) {
+                resultsContainer.innerHTML = `
+                `;
+                resultsCount.textContent = 'Results: 0';
+            }
+        }, 1000);
+
+        // On page load, hide fullscreen search toggle button
+        fullscreenSearchToggleBtn.style.display = 'none';
+
+        // Utility: Add collapse/expand to file results
+        function makeFileResultsCollapsible() {
+            document.querySelectorAll('.file-result').forEach(fileResult => {
+                const header = fileResult.querySelector('.file-header');
+                const content = fileResult.querySelector('.file-content');
+                if (!header || !content) return;
+
+                // Add collapse icon if not present
+                if (!header.querySelector('.collapse-icon')) {
+                    const icon = document.createElement('span');
+                    icon.className = 'collapse-icon';
+                    icon.innerHTML = '<i class="fas fa-chevron-down"></i>';
+                    header.appendChild(icon);
+                }
+
+                // Default: expanded
+                header.classList.remove('collapsed');
+                content.classList.remove('collapsed');
+
+                header.onclick = function() {
+                    const isCollapsed = content.classList.toggle('collapsed');
+                    header.classList.toggle('collapsed', isCollapsed);
+                };
+            });
+        }
+
+        // Drag & Drop support for file upload area
+        fileUploadArea.addEventListener('dragover', (e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            fileUploadArea.classList.add('dragover');
+        });
+        fileUploadArea.addEventListener('dragleave', (e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            fileUploadArea.classList.remove('dragover');
+        });
+        fileUploadArea.addEventListener('drop', (e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            fileUploadArea.classList.remove('dragover');
+            const files = Array.from(e.dataTransfer.files).filter(f => f.type === 'text/plain' || f.name.endsWith('.txt'));
+            if (files.length === 0) {
+                alert('Please drop only text files (.txt)');
+                return;
+            }
+            // Simulate file input change event for consistency
+            handleFileUpload({ target: { files } });
+        });
+    </script>
+</body>
+</html>
