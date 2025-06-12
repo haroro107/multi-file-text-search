@@ -247,6 +247,24 @@ function updateFileList() {
     });
 }
 
+// Function to show loading state
+function showLoadingState() {
+    resultsContainer.innerHTML = `
+        <div class="loading-state">
+            <div class="spinner"></div>
+            <h3>Searching...</h3>
+            <p>Processing your search request</p>
+        </div>
+    `;
+    resultsCount.textContent = "Results: ...";
+}
+
+// Function to hide loading state
+function hideLoadingState() {
+    // This function doesn't need to do anything explicitly
+    // as the loading state will be replaced by search results
+}
+
 // Perform search (normal or fullscreen)
 function performSearch(isFullscreen = false) {
     let rawInput, searchTerms, mode;
@@ -290,130 +308,135 @@ function performSearch(isFullscreen = false) {
         return;
     }
 
-    let totalResults = 0;
-    resultsContainer.innerHTML = "";
+    // Show loading state before starting the search
+    showLoadingState();
 
-    // Track which terms are found in any file
-    let foundTermsGlobal = new Set();
+    // Use setTimeout to allow the loading state to render before the search starts
+    setTimeout(() => {
+        let totalResults = 0;
+        resultsContainer.innerHTML = "";
 
-    uploadedFiles.forEach((file) => {
-        let matchingLines = [];
-        if (mode === "or") {
-            matchingLines = file.lines.filter((line) =>
-                searchTerms.some((term) =>
-                    line.toLowerCase().includes(term.toLowerCase())
-                )
-            );
-        } else if (mode === "and") {
-            matchingLines = file.lines.filter((line) =>
-                searchTerms.every((term) =>
-                    line.toLowerCase().includes(term.toLowerCase())
-                )
-            );
-        } else if (mode === "not") {
-            matchingLines = file.lines.filter((line) =>
-                searchTerms.every(
-                    (term) => !line.toLowerCase().includes(term.toLowerCase())
-                )
-            );
-        }
+        // Track which terms are found in any file
+        let foundTermsGlobal = new Set();
 
-        const fileResult = document.createElement("div");
-        fileResult.className = "file-result";
+        uploadedFiles.forEach((file) => {
+            let matchingLines = [];
+            if (mode === "or") {
+                matchingLines = file.lines.filter((line) =>
+                    searchTerms.some((term) =>
+                        line.toLowerCase().includes(term.toLowerCase())
+                    )
+                );
+            } else if (mode === "and") {
+                matchingLines = file.lines.filter((line) =>
+                    searchTerms.every((term) =>
+                        line.toLowerCase().includes(term.toLowerCase())
+                    )
+                );
+            } else if (mode === "not") {
+                matchingLines = file.lines.filter((line) =>
+                    searchTerms.every(
+                        (term) => !line.toLowerCase().includes(term.toLowerCase())
+                    )
+                );
+            }
 
-        const header = document.createElement("div");
-        header.className = "file-header";
-        header.innerHTML = `from ${file.name}`;
+            const fileResult = document.createElement("div");
+            fileResult.className = "file-result";
 
-        const content = document.createElement("div");
-        content.className = "file-content";
-        if (resultsSection.classList.contains("fullscreen")) {
-            content.classList.add("fullscreen");
-        }
+            const header = document.createElement("div");
+            header.className = "file-header";
+            header.innerHTML = `from ${file.name}`;
 
-        if (matchingLines.length > 0) {
-            totalResults += matchingLines.length;
-            matchingLines.forEach((line) => {
-                const entry = document.createElement("div");
-                entry.className = "file-entry";
+            const content = document.createElement("div");
+            content.className = "file-content";
+            if (resultsSection.classList.contains("fullscreen")) {
+                content.classList.add("fullscreen");
+            }
 
-                // Highlight all search terms
-                let highlightedLine = line;
-                searchTerms.forEach((term) => {
-                    if (term) {
-                        const regex = new RegExp(
-                            term.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"),
-                            "gi"
-                        );
-                        highlightedLine = highlightedLine.replace(
-                            regex,
-                            (match) => `<span class="highlight">${match}</span>`
-                        );
-                    }
-                });
-
-                entry.innerHTML = highlightedLine;
-                content.appendChild(entry);
-            });
-        }
-
-        // For OR mode, show "not found" for each search term not found in this file
-        if (mode === "or") {
-            const foundTerms = new Set();
-            matchingLines.forEach((line) => {
-                searchTerms.forEach((term) => {
-                    if (line.toLowerCase().includes(term.toLowerCase())) {
-                        foundTerms.add(term.toLowerCase());
-                        foundTermsGlobal.add(term.toLowerCase());
-                    }
-                });
-            });
-            const notFoundTerms = searchTerms.filter(
-                (term) => !foundTerms.has(term.toLowerCase())
-            );
-            if (notFoundTerms.length > 0) {
-                notFoundTerms.forEach((term) => {
+            if (matchingLines.length > 0) {
+                totalResults += matchingLines.length;
+                matchingLines.forEach((line) => {
                     const entry = document.createElement("div");
                     entry.className = "file-entry";
-                    entry.style.opacity = "0.6";
-                    entry.style.fontStyle = "italic";
-                    entry.innerHTML = `<span class="highlight">${term}</span> <span style="color:#ff5e62;">not found</span>`;
+
+                    // Highlight all search terms
+                    let highlightedLine = line;
+                    searchTerms.forEach((term) => {
+                        if (term) {
+                            const regex = new RegExp(
+                                term.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"),
+                                "gi"
+                            );
+                            highlightedLine = highlightedLine.replace(
+                                regex,
+                                (match) => `<span class="highlight">${match}</span>`
+                            );
+                        }
+                    });
+
+                    entry.innerHTML = highlightedLine;
                     content.appendChild(entry);
                 });
             }
-        }
-        // For NOT mode, show "excluded" for each search term
-        if (mode === "not" && searchTerms.length > 0) {
-            const entry = document.createElement("div");
-            entry.className = "file-entry";
-            entry.style.opacity = "0.6";
-            entry.style.fontStyle = "italic";
-            entry.innerHTML = `<span class="highlight">${searchTerms.join(
-                ", "
-            )}</span> <span style="color:#ff5e62;">excluded</span>`;
-            content.appendChild(entry);
-        }
 
-        if (
-            matchingLines.length > 0 ||
-            (mode === "or" && content.childNodes.length > 0)
-        ) {
-            fileResult.appendChild(header);
-            fileResult.appendChild(content);
-            resultsContainer.appendChild(fileResult);
-        }
-    });
+            // For OR mode, show "not found" for each search term not found in this file
+            if (mode === "or") {
+                const foundTerms = new Set();
+                matchingLines.forEach((line) => {
+                    searchTerms.forEach((term) => {
+                        if (line.toLowerCase().includes(term.toLowerCase())) {
+                            foundTerms.add(term.toLowerCase());
+                            foundTermsGlobal.add(term.toLowerCase());
+                        }
+                    });
+                });
+                const notFoundTerms = searchTerms.filter(
+                    (term) => !foundTerms.has(term.toLowerCase())
+                );
+                if (notFoundTerms.length > 0) {
+                    notFoundTerms.forEach((term) => {
+                        const entry = document.createElement("div");
+                        entry.className = "file-entry";
+                        entry.style.opacity = "0.6";
+                        entry.style.fontStyle = "italic";
+                        entry.innerHTML = `<span class="highlight">${term}</span> <span style="color:#ff5e62;">not found</span>`;
+                        content.appendChild(entry);
+                    });
+                }
+            }
+            // For NOT mode, show "excluded" for each search term
+            if (mode === "not" && searchTerms.length > 0) {
+                const entry = document.createElement("div");
+                entry.className = "file-entry";
+                entry.style.opacity = "0.6";
+                entry.style.fontStyle = "italic";
+                entry.innerHTML = `<span class="highlight">${searchTerms.join(
+                    ", "
+                )}</span> <span style="color:#ff5e62;">excluded</span>`;
+                content.appendChild(entry);
+            }
 
-    // Show global not found summary at the bottom (for OR mode)
-    if (mode === "or" && searchTerms.length > 0) {
-        const notFoundGlobal = searchTerms.filter(
-            (term) => !foundTermsGlobal.has(term.toLowerCase())
-        );
-        if (notFoundGlobal.length > 0) {
-            const summary = document.createElement("div");
-            summary.className = "empty-state";
-            summary.style.marginTop = "32px";
-            summary.innerHTML = `
+            if (
+                matchingLines.length > 0 ||
+                (mode === "or" && content.childNodes.length > 0)
+            ) {
+                fileResult.appendChild(header);
+                fileResult.appendChild(content);
+                resultsContainer.appendChild(fileResult);
+            }
+        });
+
+        // Show global not found summary at the bottom (for OR mode)
+        if (mode === "or" && searchTerms.length > 0) {
+            const notFoundGlobal = searchTerms.filter(
+                (term) => !foundTermsGlobal.has(term.toLowerCase())
+            );
+            if (notFoundGlobal.length > 0) {
+                const summary = document.createElement("div");
+                summary.className = "empty-state";
+                summary.style.marginTop = "32px";
+                summary.innerHTML = `
                         <i class="fas fa-exclamation-circle"></i>
                         <h3>Not Found In Any File</h3>
                         <p>
@@ -425,75 +448,83 @@ function performSearch(isFullscreen = false) {
                                 .join(", ")}
                         </p>
                     `;
-            resultsContainer.appendChild(summary);
+                resultsContainer.appendChild(summary);
+            }
         }
-    }
 
-    if (totalResults === 0) {
-        resultsContainer.innerHTML = `
-                    <div class="empty-state">
-                        <i class="fas fa-search"></i>
-                        <h3>No Results Found</h3>
-                        <p>No entries match your search term${
-                            searchTerms.length > 1 ? "s" : ""
-                        }${
+        if (totalResults === 0) {
+            resultsContainer.innerHTML = `
+                <div class="empty-state">
+                    <i class="fas fa-search"></i>
+                    <h3>No Results Found</h3>
+                    <p>No entries match your search term${
+                        searchTerms.length > 1 ? "s" : ""
+                    }${
             searchTerms.length ? ` "${searchTerms.join(", ")}"` : ""
         }</p>
-                    </div>
-                `;
-    }
+                </div>
+            `;
+        }
 
-    resultsCount.textContent = `Results: ${totalResults}`;
+        resultsCount.textContent = `Results: ${totalResults}`;
 
-    // Make collapsible after rendering
-    makeFileResultsCollapsible();
+        // Make collapsible after rendering
+        makeFileResultsCollapsible();
+    }, 300); // Small delay to show loading state
 }
 
 // Show all data grouped by file
 function showAllData() {
-    resultsContainer.innerHTML = "";
-    let totalResults = 0;
-    uploadedFiles.forEach((file) => {
-        if (file.lines.length === 0) return;
-        const fileResult = document.createElement("div");
-        fileResult.className = "file-result";
+    // Show loading state before loading all data
+    showLoadingState();
 
-        const header = document.createElement("div");
-        header.className = "file-header";
-        header.innerHTML = `from ${file.name}`;
+    // Use setTimeout to allow the loading state to render
+    setTimeout(() => {
+        resultsContainer.innerHTML = "";
+        let totalResults = 0;
+        
+        uploadedFiles.forEach((file) => {
+            if (file.lines.length === 0) return;
+            const fileResult = document.createElement("div");
+            fileResult.className = "file-result";
 
-        const content = document.createElement("div");
-        content.className = "file-content";
-        if (resultsSection.classList.contains("fullscreen")) {
-            content.classList.add("fullscreen");
-        }
+            const header = document.createElement("div");
+            header.className = "file-header";
+            header.innerHTML = `from ${file.name}`;
 
-        file.lines.forEach((line) => {
-            const entry = document.createElement("div");
-            entry.className = "file-entry";
-            entry.textContent = line;
-            content.appendChild(entry);
+            const content = document.createElement("div");
+            content.className = "file-content";
+            if (resultsSection.classList.contains("fullscreen")) {
+                content.classList.add("fullscreen");
+            }
+
+            file.lines.forEach((line) => {
+                const entry = document.createElement("div");
+                entry.className = "file-entry";
+                entry.textContent = line;
+                content.appendChild(entry);
+            });
+
+            fileResult.appendChild(header);
+            fileResult.appendChild(content);
+            resultsContainer.appendChild(fileResult);
+            totalResults += file.lines.length;
         });
 
-        fileResult.appendChild(header);
-        fileResult.appendChild(content);
-        resultsContainer.appendChild(fileResult);
-        totalResults += file.lines.length;
-    });
-
-    if (totalResults === 0) {
-        resultsContainer.innerHTML = `
+        if (totalResults === 0) {
+            resultsContainer.innerHTML = `
                     <div class="empty-state">
                         <i class="fas fa-file-alt"></i>
                         <h3>No Data</h3>
                         <p>No entries to display</p>
                     </div>
                 `;
-    }
-    resultsCount.textContent = `Results: ${totalResults}`;
+        }
+        resultsCount.textContent = `Results: ${totalResults}`;
 
-    // Make collapsible after rendering
-    makeFileResultsCollapsible();
+        // Make collapsible after rendering
+        makeFileResultsCollapsible();
+    }, 200); // Small delay to show loading state
 }
 
 // Clear all uploaded files
