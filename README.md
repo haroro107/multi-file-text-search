@@ -17,7 +17,7 @@ A browser-based tool for searching through multiple text files simultaneously. T
 
 ## How to Use
 
-1. Open `txt-search.html` in your web browser
+1. Open `index.html` in your web browser
 2. Upload text files using the drag and drop area or by clicking the upload button
 3. Enter your search terms in the search box
 4. Select your search mode (OR, AND, or NOT)
