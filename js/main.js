@@ -24,6 +24,14 @@ const fullscreenSearchToggleBtn = document.getElementById(
 );
 const fileUploadArea = document.querySelector(".file-upload");
 
+// Helper function to clean search input by removing empty lines
+function cleanSearchInput(input) {
+    return input
+        .split('\n')
+        .filter(line => line.trim() !== '')
+        .join('\n');
+}
+
 // Setup event listeners
 uploadButton.addEventListener("click", () => fileInput.click());
 fileInput.addEventListener("change", handleFileUpload);
@@ -270,29 +278,37 @@ function performSearch(isFullscreen = false) {
     let rawInput, searchTerms, mode;
     if (isFullscreen && resultsSection.classList.contains("fullscreen")) {
         rawInput = fullscreenSearchInput.value.trim();
-        searchTerms = rawInput
+        // Clean the input to remove empty lines
+        const cleanedInput = cleanSearchInput(rawInput);
+        fullscreenSearchInput.value = cleanedInput;
+        searchTerms = cleanedInput
             .split("\n")
-            .map((t) => t.trim())
             .filter(Boolean);
         // Get selected radio button value for fullscreen
         mode = document.querySelector('input[name="fullscreen-search-mode"]:checked').value;
         // Sync value to main search input
-        searchInput.value = rawInput;
+        searchInput.value = cleanedInput;
         // Sync radio button selection
         document.querySelector(`input[name="search-mode"][value="${mode}"]`).checked = true;
     } else {
         rawInput = searchInput.value.trim();
-        searchTerms = rawInput
+        // Clean the input to remove empty lines
+        const cleanedInput = cleanSearchInput(rawInput);
+        searchInput.value = cleanedInput;
+        searchTerms = cleanedInput
             .split("\n")
-            .map((t) => t.trim())
             .filter(Boolean);
         // Get selected radio button value 
         mode = document.querySelector('input[name="search-mode"]:checked').value;
         // Sync value to fullscreen search input
-        fullscreenSearchInput.value = rawInput;
+        fullscreenSearchInput.value = cleanedInput;
         // Sync radio button selection
         document.querySelector(`input[name="fullscreen-search-mode"][value="${mode}"]`).checked = true;
     }
+
+    // Adjust textarea heights after cleaning
+    adjustTextareaHeight(searchInput);
+    adjustTextareaHeight(fullscreenSearchInput);
 
     if (searchTerms.length === 0) {
         // If no search terms, show all data if files uploaded
