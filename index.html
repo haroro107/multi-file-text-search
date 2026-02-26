@@ -13,7 +13,7 @@
     <div class="container">
         <header>
             <h1>Text File Search Tool</h1>
-            <p class="description">Upload multiple text files containing file paths and search through their contents. The application will display matching entries grouped by source file.</p>
+            <p class="description">Upload multiple text files and search line-by-line instantly in your browser. Results stay grouped by source file so findings are easier to review.</p>
         </header>
 
         <div class="app-container">
@@ -28,33 +28,52 @@
                         <input type="file" id="file-input" accept=".txt" multiple>
                     </div>
                     <div id="file-list"></div>
+                    <div class="stats-row">
+                        <span class="stat-chip" id="stats-files">Files: 0</span>
+                        <span class="stat-chip" id="stats-lines">Lines: 0</span>
+                    </div>
                 </div>
 
                 <div class="search-section">
                     <h2><i class="fas fa-search"></i> Search Content</h2>
                     <div class="search-container">
                         <textarea id="search-input" placeholder="Enter search terms, one per line"></textarea>
-                        <div id="search-mode" class="search-mode-group">
-                            <label class="search-mode-btn">
-                                <input type="radio" name="search-mode" value="or" checked>
-                                <span>OR</span>
-                            </label>
-                            <label class="search-mode-btn">
-                                <input type="radio" name="search-mode" value="and">
-                                <span>AND</span>
-                            </label>
-                            <label class="search-mode-btn">
-                                <input type="radio" name="search-mode" value="not">
-                                <span>NOT</span>
-                            </label>
+
+                        <div class="search-controls">
+                            <div id="search-mode" class="search-mode-group">
+                                <label class="search-mode-btn">
+                                    <input type="radio" name="search-mode" value="or" checked>
+                                    <span>OR</span>
+                                </label>
+                                <label class="search-mode-btn">
+                                    <input type="radio" name="search-mode" value="and">
+                                    <span>AND</span>
+                                </label>
+                                <label class="search-mode-btn">
+                                    <input type="radio" name="search-mode" value="not">
+                                    <span>NOT</span>
+                                </label>
+                            </div>
+
+                            <div class="search-options" id="search-options">
+                                <label class="option-toggle">
+                                    <input type="checkbox" id="case-sensitive">
+                                    <span>Case Sensitive</span>
+                                </label>
+                                <label class="option-toggle">
+                                    <input type="checkbox" id="whole-word">
+                                    <span>Whole Word</span>
+                                </label>
+                            </div>
+
+                            <button id="search-btn"><i class="fas fa-search"></i> Search</button>
                         </div>
-                        <button id="search-btn">Search</button>
                     </div>
+                    <p class="search-help">Tip: Press <strong>Enter</strong> to search, <strong>Shift + Enter</strong> to create a new line.</p>
                 </div>
             </div>
 
             <div class="results-section">
-                <!-- Fullscreen search bar (hidden by default) -->
                 <div class="fullscreen-search-bar" id="fullscreen-search-bar">
                     <textarea id="fullscreen-search-input" placeholder="Enter search terms, one per line"></textarea>
                     <div id="fullscreen-search-mode" class="search-mode-group">
@@ -71,20 +90,38 @@
                             <span>NOT</span>
                         </label>
                     </div>
+                    <div class="search-options">
+                        <label class="option-toggle">
+                            <input type="checkbox" id="fullscreen-case-sensitive">
+                            <span>Case Sensitive</span>
+                        </label>
+                        <label class="option-toggle">
+                            <input type="checkbox" id="fullscreen-whole-word">
+                            <span>Whole Word</span>
+                        </label>
+                    </div>
                     <button id="fullscreen-search-btn"><i class="fas fa-search"></i></button>
                 </div>
+
                 <div class="results-header">
-                    <div id="results-count">Results: 0</div>
-                    <div style="display: flex; gap: 10px; align-items: center;">
+                    <div class="results-meta">
+                        <div id="results-count">Results: 0</div>
+                        <div id="search-meta">Upload files to start searching.</div>
+                    </div>
+                    <div class="results-actions">
+                        <button class="secondary-btn" id="export-btn" title="Export latest results" disabled>
+                            <i class="fas fa-file-export"></i> Export Results
+                        </button>
                         <button class="fullscreen-search-toggle-btn" id="fullscreen-search-toggle-btn" title="Show/Hide Search in Fullscreen" style="display:none;">
                             <i class="fas fa-search"></i> Search
                         </button>
-                        <span id="clear-input-btn" style="color:#42a5f5;cursor:pointer;font-weight:500;font-size:1em;user-select:none;background:none;border:none;padding:0;transition:color 0.2s;text-decoration:underline dotted 1.5px transparent;">Clear Input Text</span>
+                        <button class="link-btn" id="clear-input-btn">Clear Input</button>
                         <button class="fullscreen-btn" id="fullscreen-btn" title="Toggle Full Screen">
                             <i class="fas fa-expand"></i> Full Screen
                         </button>
                     </div>
                 </div>
+
                 <div id="results-container">
                     <div class="empty-state">
                         <i class="fas fa-file-alt"></i>
@@ -96,8 +133,8 @@
         </div>
 
         <footer>
-            <p>Upload multiple text files and search through their content. Matching results will be grouped by source file.</p>
-            <p>&copy; 2023 haroro107. All rights reserved.</p>
+            <p>All processing happens locally in your browser. No file content is sent to any server.</p>
+            <p>&copy; 2026 haroro107. All rights reserved.</p>
         </footer>
     </div>
     <script src="js/main.js"></script>

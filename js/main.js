@@ -1,644 +1,1018 @@
-// Store uploaded files data
 let uploadedFiles = [];
+let currentResultSnapshot = null;
 
-// DOM elements
-const fileInput = document.getElementById("file-input");
-const uploadButton = document.getElementById("upload-button");
-const fileList = document.getElementById("file-list");
-const searchInput = document.getElementById("search-input");
-const searchButton = document.getElementById("search-btn");
-const searchMode = document.getElementById("search-mode");
-const resultsContainer = document.getElementById("results-container");
-const resultsCount = document.getElementById("results-count");
-const clearInputBtn = document.getElementById("clear-input-btn");
-const resultsSection = document.querySelector(".results-section");
-const fullscreenBtn = document.getElementById("fullscreen-btn");
-const fullscreenSearchBar = document.getElementById("fullscreen-search-bar");
-const fullscreenSearchInput = document.getElementById(
-    "fullscreen-search-input"
-);
-const fullscreenSearchBtn = document.getElementById("fullscreen-search-btn");
-const fullscreenSearchMode = document.getElementById("fullscreen-search-mode");
-const fullscreenSearchToggleBtn = document.getElementById(
-    "fullscreen-search-toggle-btn"
-);
-const fileUploadArea = document.querySelector(".file-upload");
+const MAX_FILE_SIZE_BYTES = 10 * 1024 * 1024;
 
-// Helper function to clean search input by removing empty lines
-function cleanSearchInput(input) {
+const dom = {
+    fileInput: document.getElementById("file-input"),
+    uploadButton: document.getElementById("upload-button"),
+    fileList: document.getElementById("file-list"),
+    searchInput: document.getElementById("search-input"),
+    searchButton: document.getElementById("search-btn"),
+    resultsContainer: document.getElementById("results-container"),
+    resultsCount: document.getElementById("results-count"),
+    searchMeta: document.getElementById("search-meta"),
+    clearInputBtn: document.getElementById("clear-input-btn"),
+    resultsSection: document.querySelector(".results-section"),
+    fullscreenBtn: document.getElementById("fullscreen-btn"),
+    fullscreenSearchBar: document.getElementById("fullscreen-search-bar"),
+    fullscreenSearchInput: document.getElementById("fullscreen-search-input"),
+    fullscreenSearchBtn: document.getElementById("fullscreen-search-btn"),
+    fullscreenSearchToggleBtn: document.getElementById(
+        "fullscreen-search-toggle-btn"
+    ),
+    fileUploadArea: document.querySelector(".file-upload"),
+    exportBtn: document.getElementById("export-btn"),
+    statsFiles: document.getElementById("stats-files"),
+    statsLines: document.getElementById("stats-lines"),
+    caseSensitive: document.getElementById("case-sensitive"),
+    wholeWord: document.getElementById("whole-word"),
+    fullscreenCaseSensitive: document.getElementById(
+        "fullscreen-case-sensitive"
+    ),
+    fullscreenWholeWord: document.getElementById("fullscreen-whole-word"),
+};
+
+function formatNumber(value) {
+    return new Intl.NumberFormat().format(value);
+}
+
+function formatBytes(bytes) {
+    if (!Number.isFinite(bytes) || bytes <= 0) return "0 B";
+    const units = ["B", "KB", "MB", "GB"];
+    const unitIndex = Math.min(
+        Math.floor(Math.log(bytes) / Math.log(1024)),
+        units.length - 1
+    );
+    const size = bytes / 1024 ** unitIndex;
+    return `${size.toFixed(size >= 10 || unitIndex === 0 ? 0 : 1)} ${
+        units[unitIndex]
+    }`;
+}
+
+function escapeHtml(input) {
     return input
-        .split('\n')
-        .filter(line => line.trim() !== '')
-        .join('\n');
+        .replaceAll("&", "&amp;")
+        .replaceAll("<", "&lt;")
+        .replaceAll(">", "&gt;")
+        .replaceAll('"', "&quot;")
+        .replaceAll("'", "&#39;");
 }
 
-// Setup event listeners
-uploadButton.addEventListener("click", () => fileInput.click());
-fileInput.addEventListener("change", handleFileUpload);
-searchButton.addEventListener("click", performSearch);
-
-// Add event listeners for radio button changes
-document.querySelectorAll('input[name="search-mode"]').forEach(radio => {
-    radio.addEventListener('change', () => performSearch());
-});
-
-document.querySelectorAll('input[name="fullscreen-search-mode"]').forEach(radio => {
-    radio.addEventListener('change', () => performSearch(true));
-});
-
-// Handle textarea height adjustment with Shift+Enter
-searchInput.addEventListener("keydown", (e) => {
-    if (e.key === "Enter") {
-        if (e.shiftKey) {
-            // Allow the default behavior (add a new line)
-            adjustTextareaHeight(e.target);
-        } else {
-            e.preventDefault();
-            performSearch();
-        }
-    }
-});
-
-fullscreenSearchInput.addEventListener("keydown", (e) => {
-    if (e.key === "Enter") {
-        if (e.shiftKey) {
-            // Allow the default behavior (add a new line)
-            adjustTextareaHeight(e.target);
-        } else {
-            e.preventDefault();
-            performSearch(true);
-        }
-    }
-});
-
-// Function to adjust textarea height based on content
-function adjustTextareaHeight(textarea) {
-    // Use setTimeout to ensure the new line is added before measuring height
-    setTimeout(() => {
-        textarea.style.height = "auto";
-        textarea.style.height = textarea.scrollHeight + "px";
-    }, 0);
+function escapeRegExp(input) {
+    return input.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 }
 
-// Initialize textarea height adjustment on input
-searchInput.addEventListener("input", () => adjustTextareaHeight(searchInput));
-fullscreenSearchInput.addEventListener("input", () =>
-    adjustTextareaHeight(fullscreenSearchInput)
-);
-clearInputBtn.addEventListener("click", () => {
-    searchInput.value = "";
-    fullscreenSearchInput.value = "";
-    // Reset textarea heights
-    searchInput.style.height = "";
-    fullscreenSearchInput.style.height = "";
-    if (uploadedFiles.length > 0) {
-        showAllData();
-    } else {
-        resultsContainer.innerHTML = `
-                    <div class="empty-state">
-                        <i class="fas fa-file-alt"></i>
-                        <h3>No Files Uploaded</h3>
-                        <p>Upload text files to begin searching</p>
-                    </div>
-                `;
-        resultsCount.textContent = "Results: 0";
-    }
-});
+function normalizeLineBreaks(input) {
+    return input.replace(/\r\n?/g, "\n");
+}
 
-// Show/hide fullscreen search bar
-fullscreenSearchToggleBtn.addEventListener("click", () => {
-    fullscreenSearchBar.classList.toggle("visible");
-    if (fullscreenSearchBar.classList.contains("visible")) {
-        fullscreenSearchInput.focus();
-    }
-});
+function normalizeSearchInput(input) {
+    return normalizeLineBreaks(input)
+        .split("\n")
+        .map((line) => line.trim())
+        .filter(Boolean)
+        .join("\n");
+}
 
-// Fullscreen search event
-fullscreenSearchBtn.addEventListener("click", () => {
-    performSearch(true);
-});
-fullscreenSearchInput.addEventListener("keydown", (e) => {
-    if (e.key === "Enter" && !e.shiftKey) {
-        e.preventDefault();
-        performSearch(true);
-    }
-});
+function parseSearchTerms(input, caseSensitive) {
+    const seen = new Set();
+    const terms = [];
 
-// Full screen toggle
-fullscreenBtn.addEventListener("click", () => {
-    resultsSection.classList.toggle("fullscreen");
-    // Toggle .fullscreen on all .file-content elements
-    document.querySelectorAll(".file-content").forEach((el) => {
-        if (resultsSection.classList.contains("fullscreen")) {
-            el.classList.add("fullscreen");
-        } else {
-            el.classList.remove("fullscreen");
-        }
-    });
-    // Toggle fullscreen search toggle button
-    if (resultsSection.classList.contains("fullscreen")) {
-        fullscreenBtn.innerHTML =
-            '<i class="fas fa-compress"></i> Exit Full Screen';
-        fullscreenSearchToggleBtn.style.display = "";
-    } else {
-        fullscreenBtn.innerHTML = '<i class="fas fa-expand"></i> Full Screen';
-        fullscreenSearchToggleBtn.style.display = "none";
-        fullscreenSearchBar.classList.remove("visible");
-    }
-});
+    normalizeLineBreaks(input)
+        .split("\n")
+        .forEach((term) => {
+            const cleaned = term.trim();
+            if (!cleaned) return;
 
-// Handle file upload
-function handleFileUpload(e) {
-    const files = Array.from(e.target.files);
+            const key = caseSensitive ? cleaned : cleaned.toLowerCase();
+            if (seen.has(key)) return;
 
-    if (files.length === 0) return;
+            seen.add(key);
+            terms.push(cleaned);
+        });
 
-    files.forEach((file) => {
-        if (file.type !== "text/plain") {
-            alert("Please upload only text files (.txt)");
-            return;
-        }
+    return terms;
+}
 
+function isTextFile(file) {
+    return file.type === "text/plain" || /\.txt$/i.test(file.name);
+}
+
+function readFileAsText(file) {
+    return new Promise((resolve, reject) => {
         const reader = new FileReader();
-        reader.onload = function (event) {
-            const content = event.target.result;
-            const fileName = file.name;
-            // Use a unique key for each file: name + size + lastModified
-            const uniqueKey = `${file.name}_${file.size}_${file.lastModified}`;
-
-            // Check if file is already uploaded (by uniqueKey)
-            if (uploadedFiles.some((f) => f.uniqueKey === uniqueKey)) {
-                alert(`File "${fileName}" is already uploaded`);
-                return;
-            }
-
-            // Store file content with uniqueKey
-            uploadedFiles.push({
-                name: fileName,
-                uniqueKey: uniqueKey,
-                content: content,
-                lines: content.split("\n").filter((line) => line.trim() !== ""),
-            });
-
-            // Update UI
-            updateFileList();
-            updateEmptyState();
-
-            // If search input is empty, show all data
-            if (!searchInput.value.trim()) {
-                showAllData();
-            }
-        };
+        reader.onload = (event) => resolve(event.target.result || "");
+        reader.onerror = () => reject(new Error(`Failed to read ${file.name}`));
         reader.readAsText(file);
     });
-
-    // Reset input to allow uploading same file again
-    fileInput.value = "";
 }
 
-// Update the file list display
-function updateFileList() {
-    if (uploadedFiles.length === 0) {
-        fileList.innerHTML = "<p>No files uploaded yet</p>";
-        return;
+function buildFileRecord(file, content) {
+    const normalized = normalizeLineBreaks(content);
+    const rows = normalized.split("\n");
+    const lines = [];
+
+    rows.forEach((rawLine, index) => {
+        if (!rawLine.trim()) return;
+        lines.push({
+            lineNumber: index + 1,
+            raw: rawLine,
+            lower: rawLine.toLowerCase(),
+        });
+    });
+
+    return {
+        name: file.name,
+        uniqueKey: `${file.name}_${file.size}_${file.lastModified}`,
+        size: file.size,
+        lines,
+    };
+}
+
+function getSearchMode(isFullscreen) {
+    const selector = isFullscreen
+        ? 'input[name="fullscreen-search-mode"]:checked'
+        : 'input[name="search-mode"]:checked';
+    const selected = document.querySelector(selector);
+    return selected ? selected.value : "or";
+}
+
+function getSearchOptions(isFullscreen) {
+    if (isFullscreen && dom.resultsSection.classList.contains("fullscreen")) {
+        return {
+            caseSensitive: Boolean(dom.fullscreenCaseSensitive.checked),
+            wholeWord: Boolean(dom.fullscreenWholeWord.checked),
+        };
     }
 
-    fileList.innerHTML = `
-                <div class="file-list-header" style="display:flex;align-items:center;justify-content:space-between;">
-                    <span><strong>Uploaded Files:</strong> (${uploadedFiles.length})</span>
-                    <span id="clear-files-link" style="color:#ff7043;cursor:pointer;font-weight:500;font-size:1em;user-select:none;">Clear All Files</span>
-                </div>
-            `;
-
-    // Add event for clear all files link
-    setTimeout(() => {
-        const clearFilesLink = document.getElementById("clear-files-link");
-        if (clearFilesLink) {
-            clearFilesLink.onclick = clearAllFiles;
-        }
-    }, 0);
-
-    uploadedFiles.forEach((file, idx) => {
-        const fileItem = document.createElement("div");
-        fileItem.className = "file-item";
-        // Add remove button for each file
-        fileItem.innerHTML = `
-                    <i class="fas fa-file-alt"></i> ${file.name} (${file.lines.length} entries)
-                    <button class="remove-file-btn" title="Remove file" style="margin-left:12px; color:#ff7043; background:none; border:none; cursor:pointer; font-size:1.1em;">
-                        <i class="fas fa-times"></i>
-                    </button>
-                `;
-        // Remove file on button click
-        fileItem.querySelector(".remove-file-btn").onclick = function () {
-            uploadedFiles.splice(idx, 1);
-            updateFileList();
-            if (uploadedFiles.length === 0) {
-                resultsContainer.innerHTML = `
-                            <div class="empty-state">
-                                <i class="fas fa-file-alt"></i>
-                                <h3>No Files Uploaded</h3>
-                                <p>Upload text files to begin searching</p>
-                            </div>
-                        `;
-                resultsCount.textContent = "Results: 0";
-                searchInput.value = "";
-            } else {
-                // If search input is empty, show all data; else, re-search
-                if (!searchInput.value.trim()) {
-                    showAllData();
-                } else {
-                    performSearch();
-                }
-            }
-        };
-        fileList.appendChild(fileItem);
-    });
+    return {
+        caseSensitive: Boolean(dom.caseSensitive.checked),
+        wholeWord: Boolean(dom.wholeWord.checked),
+    };
 }
 
-// Function to show loading state
+function syncSearchMode(mode) {
+    const mainMode = document.querySelector(
+        `input[name="search-mode"][value="${mode}"]`
+    );
+    const fullscreenMode = document.querySelector(
+        `input[name="fullscreen-search-mode"][value="${mode}"]`
+    );
+
+    if (mainMode) mainMode.checked = true;
+    if (fullscreenMode) fullscreenMode.checked = true;
+}
+
+function syncSearchOptions(options) {
+    dom.caseSensitive.checked = options.caseSensitive;
+    dom.fullscreenCaseSensitive.checked = options.caseSensitive;
+    dom.wholeWord.checked = options.wholeWord;
+    dom.fullscreenWholeWord.checked = options.wholeWord;
+}
+
+function syncSearchInputs(value) {
+    dom.searchInput.value = value;
+    dom.fullscreenSearchInput.value = value;
+    adjustTextareaHeight(dom.searchInput);
+    adjustTextareaHeight(dom.fullscreenSearchInput);
+}
+
+function getActiveInputValue(isFullscreen) {
+    if (isFullscreen && dom.resultsSection.classList.contains("fullscreen")) {
+        return dom.fullscreenSearchInput.value;
+    }
+    return dom.searchInput.value;
+}
+
+function setSearchMeta(text) {
+    dom.searchMeta.textContent = text;
+}
+
+function setResultsCount(value) {
+    dom.resultsCount.textContent = `Results: ${formatNumber(value)}`;
+}
+
+function updateQuickStats() {
+    const totalLines = uploadedFiles.reduce((sum, file) => sum + file.lines.length, 0);
+    dom.statsFiles.textContent = `Files: ${formatNumber(uploadedFiles.length)}`;
+    dom.statsLines.textContent = `Lines: ${formatNumber(totalLines)}`;
+}
+
+function showNoFilesState() {
+    dom.resultsContainer.innerHTML = `
+        <div class="empty-state">
+            <i class="fas fa-file-alt"></i>
+            <h3>No Files Uploaded</h3>
+            <p>Upload text files to begin searching</p>
+        </div>
+    `;
+    setResultsCount(0);
+    setSearchMeta("Upload files to start searching.");
+    dom.exportBtn.disabled = true;
+}
+
+function showReadyState() {
+    dom.resultsContainer.innerHTML = `
+        <div class="empty-state">
+            <i class="fas fa-search"></i>
+            <h3>Ready to Search</h3>
+            <p>Type one or more keywords, then press Enter or click Search.</p>
+        </div>
+    `;
+    setResultsCount(0);
+    setSearchMeta("Files uploaded. Enter keyword(s) to search.");
+    dom.exportBtn.disabled = true;
+}
+
 function showLoadingState() {
-    resultsContainer.innerHTML = `
+    dom.resultsContainer.innerHTML = `
         <div class="loading-state">
             <div class="spinner"></div>
             <h3>Searching...</h3>
-            <p>Processing your search request</p>
+            <p>Scanning uploaded files</p>
         </div>
     `;
-    resultsCount.textContent = "Results: ...";
 }
 
-// Function to hide loading state
-function hideLoadingState() {
-    // This function doesn't need to do anything explicitly
-    // as the loading state will be replaced by search results
+function adjustTextareaHeight(textarea) {
+    textarea.style.height = "auto";
+    textarea.style.height = `${Math.min(textarea.scrollHeight, 260)}px`;
+    textarea.style.overflowY = textarea.scrollHeight > 260 ? "auto" : "hidden";
 }
 
-// Perform search (normal or fullscreen)
-function performSearch(isFullscreen = false) {
-    let rawInput, searchTerms, mode;
-    if (isFullscreen && resultsSection.classList.contains("fullscreen")) {
-        rawInput = fullscreenSearchInput.value.trim();
-        // Clean the input to remove empty lines
-        const cleanedInput = cleanSearchInput(rawInput);
-        fullscreenSearchInput.value = cleanedInput;
-        searchTerms = cleanedInput
-            .split("\n")
-            .filter(Boolean);
-        // Get selected radio button value for fullscreen
-        mode = document.querySelector('input[name="fullscreen-search-mode"]:checked').value;
-        // Sync value to main search input
-        searchInput.value = cleanedInput;
-        // Sync radio button selection
-        document.querySelector(`input[name="search-mode"][value="${mode}"]`).checked = true;
-    } else {
-        rawInput = searchInput.value.trim();
-        // Clean the input to remove empty lines
-        const cleanedInput = cleanSearchInput(rawInput);
-        searchInput.value = cleanedInput;
-        searchTerms = cleanedInput
-            .split("\n")
-            .filter(Boolean);
-        // Get selected radio button value 
-        mode = document.querySelector('input[name="search-mode"]:checked').value;
-        // Sync value to fullscreen search input
-        fullscreenSearchInput.value = cleanedInput;
-        // Sync radio button selection
-        document.querySelector(`input[name="fullscreen-search-mode"][value="${mode}"]`).checked = true;
-    }
+function buildTermTokens(terms, options) {
+    return terms.map((term) => {
+        const escaped = escapeRegExp(term);
+        const pattern = options.wholeWord ? `\\b${escaped}\\b` : escaped;
 
-    // Adjust textarea heights after cleaning
-    adjustTextareaHeight(searchInput);
-    adjustTextareaHeight(fullscreenSearchInput);
-
-    if (searchTerms.length === 0) {
-        // If no search terms, show all data if files uploaded
-        if (uploadedFiles.length > 0) {
-            showAllData();
-        } else {
-            alert("Please enter at least one search term");
-        }
-        return;
-    }
-    if (uploadedFiles.length === 0) {
-        alert("Please upload some text files first");
-        return;
-    }
-
-    // Show loading state before starting the search
-    showLoadingState();
-
-    // Use setTimeout to allow the loading state to render before the search starts
-    setTimeout(() => {
-        let totalResults = 0;
-        resultsContainer.innerHTML = "";
-
-        // Track which terms are found in any file
-        let foundTermsGlobal = new Set();
-
-        uploadedFiles.forEach((file) => {
-            let matchingLines = [];
-            if (mode === "or") {
-                matchingLines = file.lines.filter((line) =>
-                    searchTerms.some((term) =>
-                        line.toLowerCase().includes(term.toLowerCase())
-                    )
-                );
-            } else if (mode === "and") {
-                matchingLines = file.lines.filter((line) =>
-                    searchTerms.every((term) =>
-                        line.toLowerCase().includes(term.toLowerCase())
-                    )
-                );
-            } else if (mode === "not") {
-                matchingLines = file.lines.filter((line) =>
-                    searchTerms.every(
-                        (term) => !line.toLowerCase().includes(term.toLowerCase())
-                    )
-                );
-            }
-
-            const fileResult = document.createElement("div");
-            fileResult.className = "file-result";
-
-            const header = document.createElement("div");
-            header.className = "file-header";
-            header.innerHTML = `from ${file.name}`;
-
-            const content = document.createElement("div");
-            content.className = "file-content";
-            if (resultsSection.classList.contains("fullscreen")) {
-                content.classList.add("fullscreen");
-            }
-
-            if (matchingLines.length > 0) {
-                totalResults += matchingLines.length;
-                matchingLines.forEach((line) => {
-                    const entry = document.createElement("div");
-                    entry.className = "file-entry";
-
-                    // Highlight all search terms
-                    let highlightedLine = line;
-                    searchTerms.forEach((term) => {
-                        if (term) {
-                            const regex = new RegExp(
-                                term.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"),
-                                "gi"
-                            );
-                            highlightedLine = highlightedLine.replace(
-                                regex,
-                                (match) => `<span class="highlight">${match}</span>`
-                            );
-                        }
-                    });
-
-                    entry.innerHTML = highlightedLine;
-                    content.appendChild(entry);
-                });
-            }
-
-            // For OR mode, show "not found" for each search term not found in this file
-            if (mode === "or") {
-                const foundTerms = new Set();
-                matchingLines.forEach((line) => {
-                    searchTerms.forEach((term) => {
-                        if (line.toLowerCase().includes(term.toLowerCase())) {
-                            foundTerms.add(term.toLowerCase());
-                            foundTermsGlobal.add(term.toLowerCase());
-                        }
-                    });
-                });
-                const notFoundTerms = searchTerms.filter(
-                    (term) => !foundTerms.has(term.toLowerCase())
-                );
-                if (notFoundTerms.length > 0) {
-                    notFoundTerms.forEach((term) => {
-                        const entry = document.createElement("div");
-                        entry.className = "file-entry";
-                        entry.style.opacity = "0.6";
-                        entry.style.fontStyle = "italic";
-                        entry.innerHTML = `<span class="highlight">${term}</span> <span style="color:#ff5e62;">not found</span>`;
-                        content.appendChild(entry);
-                    });
-                }
-            }
-            // For NOT mode, show "excluded" for each search term
-            if (mode === "not" && searchTerms.length > 0) {
-                const entry = document.createElement("div");
-                entry.className = "file-entry";
-                entry.style.opacity = "0.6";
-                entry.style.fontStyle = "italic";
-                entry.innerHTML = `<span class="highlight">${searchTerms.join(
-                    ", "
-                )}</span> <span style="color:#ff5e62;">excluded</span>`;
-                content.appendChild(entry);
-            }
-
-            if (
-                matchingLines.length > 0 ||
-                (mode === "or" && content.childNodes.length > 0)
-            ) {
-                fileResult.appendChild(header);
-                fileResult.appendChild(content);
-                resultsContainer.appendChild(fileResult);
-            }
-        });
-
-        // Show global not found summary at the bottom (for OR mode)
-        if (mode === "or" && searchTerms.length > 0) {
-            const notFoundGlobal = searchTerms.filter(
-                (term) => !foundTermsGlobal.has(term.toLowerCase())
-            );
-            if (notFoundGlobal.length > 0) {
-                const summary = document.createElement("div");
-                summary.className = "empty-state";
-                summary.style.marginTop = "32px";
-                summary.innerHTML = `
-                        <i class="fas fa-exclamation-circle"></i>
-                        <h3>Not Found In Any File</h3>
-                        <p>
-                            ${notFoundGlobal
-                                .map(
-                                    (term) =>
-                                        `<span class="highlight">${term}</span>`
-                                )
-                                .join(", ")}
-                        </p>
-                    `;
-                resultsContainer.appendChild(summary);
-            }
-        }
-
-        if (totalResults === 0) {
-            resultsContainer.innerHTML = `
-                <div class="empty-state">
-                    <i class="fas fa-search"></i>
-                    <h3>No Results Found</h3>
-                    <p>No entries match your search term${
-                        searchTerms.length > 1 ? "s" : ""
-                    }${
-            searchTerms.length ? ` "${searchTerms.join(", ")}"` : ""
-        }</p>
-                </div>
-            `;
-        }
-
-        resultsCount.textContent = `Results: ${totalResults}`;
-
-        // Make collapsible after rendering
-        makeFileResultsCollapsible();
-    }, 300); // Small delay to show loading state
-}
-
-// Show all data grouped by file
-function showAllData() {
-    // Show loading state before loading all data
-    showLoadingState();
-
-    // Use setTimeout to allow the loading state to render
-    setTimeout(() => {
-        resultsContainer.innerHTML = "";
-        let totalResults = 0;
-        
-        uploadedFiles.forEach((file) => {
-            if (file.lines.length === 0) return;
-            const fileResult = document.createElement("div");
-            fileResult.className = "file-result";
-
-            const header = document.createElement("div");
-            header.className = "file-header";
-            header.innerHTML = `from ${file.name}`;
-
-            const content = document.createElement("div");
-            content.className = "file-content";
-            if (resultsSection.classList.contains("fullscreen")) {
-                content.classList.add("fullscreen");
-            }
-
-            file.lines.forEach((line) => {
-                const entry = document.createElement("div");
-                entry.className = "file-entry";
-                entry.textContent = line;
-                content.appendChild(entry);
-            });
-
-            fileResult.appendChild(header);
-            fileResult.appendChild(content);
-            resultsContainer.appendChild(fileResult);
-            totalResults += file.lines.length;
-        });
-
-        if (totalResults === 0) {
-            resultsContainer.innerHTML = `
-                    <div class="empty-state">
-                        <i class="fas fa-file-alt"></i>
-                        <h3>No Data</h3>
-                        <p>No entries to display</p>
-                    </div>
-                `;
-        }
-        resultsCount.textContent = `Results: ${totalResults}`;
-
-        // Make collapsible after rendering
-        makeFileResultsCollapsible();
-    }, 200); // Small delay to show loading state
-}
-
-// Clear all uploaded files
-function clearAllFiles() {
-    uploadedFiles = [];
-    updateFileList();
-    resultsContainer.innerHTML = `
-                <div class="empty-state">
-                    <i class="fas fa-file-alt"></i>
-                    <h3>No Files Uploaded</h3>
-                    <p>Upload text files to begin searching</p>
-                </div>
-            `;
-    resultsCount.textContent = "Results: 0";
-    searchInput.value = "";
-}
-
-// Update empty state
-function updateEmptyState() {
-    if (uploadedFiles.length > 0) {
-        resultsContainer.innerHTML = `
-                    <div class="empty-state">
-                        <i class="fas fa-search"></i>
-                        <h3>Ready to Search</h3>
-                        <p>Enter a search term to find matching entries</p>
-                    </div>
-                `;
-        resultsCount.textContent = "Results: 0";
-    }
-}
-
-// Initialize
-updateFileList();
-
-// Set initial heights for textareas
-adjustTextareaHeight(searchInput);
-adjustTextareaHeight(fullscreenSearchInput);
-
-// Demo data for initial display
-setTimeout(() => {
-    if (uploadedFiles.length === 0) {
-        resultsContainer.innerHTML = `
-                `;
-        resultsCount.textContent = "Results: 0";
-    }
-}, 1000);
-
-// On page load, hide fullscreen search toggle button
-fullscreenSearchToggleBtn.style.display = "none";
-
-// Utility: Add collapse/expand to file results
-function makeFileResultsCollapsible() {
-    document.querySelectorAll(".file-result").forEach((fileResult) => {
-        const header = fileResult.querySelector(".file-header");
-        const content = fileResult.querySelector(".file-content");
-        if (!header || !content) return;
-
-        // Add collapse icon if not present
-        if (!header.querySelector(".collapse-icon")) {
-            const icon = document.createElement("span");
-            icon.className = "collapse-icon";
-            icon.innerHTML = '<i class="fas fa-chevron-down"></i>';
-            header.appendChild(icon);
-        }
-
-        // Default: expanded
-        header.classList.remove("collapsed");
-        content.classList.remove("collapsed");
-
-        header.onclick = function () {
-            const isCollapsed = content.classList.toggle("collapsed");
-            header.classList.toggle("collapsed", isCollapsed);
+        return {
+            raw: term,
+            key: options.caseSensitive ? term : term.toLowerCase(),
+            compare: options.caseSensitive ? term : term.toLowerCase(),
+            testRegex: options.wholeWord
+                ? new RegExp(pattern, options.caseSensitive ? "u" : "iu")
+                : null,
+            highlightRegex: new RegExp(
+                pattern,
+                options.caseSensitive ? "gu" : "giu"
+            ),
         };
     });
 }
 
-// Drag & Drop support for file upload area
-fileUploadArea.addEventListener("dragover", (e) => {
-    e.preventDefault();
-    e.stopPropagation();
-    fileUploadArea.classList.add("dragover");
-});
-fileUploadArea.addEventListener("dragleave", (e) => {
-    e.preventDefault();
-    e.stopPropagation();
-    fileUploadArea.classList.remove("dragover");
-});
-fileUploadArea.addEventListener("drop", (e) => {
-    e.preventDefault();
-    e.stopPropagation();
-    fileUploadArea.classList.remove("dragover");
-    const files = Array.from(e.dataTransfer.files).filter(
-        (f) => f.type === "text/plain" || f.name.endsWith(".txt")
+function lineContainsToken(line, token, options) {
+    if (options.wholeWord) {
+        return token.testRegex.test(line.raw);
+    }
+
+    if (options.caseSensitive) {
+        return line.raw.includes(token.compare);
+    }
+
+    return line.lower.includes(token.compare);
+}
+
+function getLineHitIndexes(line, termTokens, options) {
+    const hitIndexes = [];
+
+    termTokens.forEach((token, index) => {
+        if (lineContainsToken(line, token, options)) {
+            hitIndexes.push(index);
+        }
+    });
+
+    return hitIndexes;
+}
+
+function doesLineMatchMode(hitIndexes, termCount, mode) {
+    if (mode === "or") return hitIndexes.length > 0;
+    if (mode === "and") return hitIndexes.length === termCount;
+    return hitIndexes.length === 0;
+}
+
+function searchFiles(termTokens, mode, options) {
+    const fileResults = [];
+    const foundTokenKeys = new Set();
+    let totalMatches = 0;
+    let scannedLines = 0;
+
+    uploadedFiles.forEach((file) => {
+        const matches = [];
+
+        file.lines.forEach((line) => {
+            scannedLines += 1;
+
+            const hitIndexes = getLineHitIndexes(line, termTokens, options);
+            const isMatch = doesLineMatchMode(hitIndexes, termTokens.length, mode);
+
+            if (!isMatch) return;
+
+            matches.push({
+                lineNumber: line.lineNumber,
+                raw: line.raw,
+                hitIndexes,
+            });
+
+            if (mode === "or") {
+                hitIndexes.forEach((hitIndex) => {
+                    foundTokenKeys.add(termTokens[hitIndex].key);
+                });
+            }
+        });
+
+        if (matches.length > 0) {
+            fileResults.push({
+                fileName: file.name,
+                matches,
+            });
+            totalMatches += matches.length;
+        }
+    });
+
+    const missingTerms =
+        mode === "or"
+            ? termTokens
+                  .filter((token) => !foundTokenKeys.has(token.key))
+                  .map((token) => token.raw)
+            : [];
+
+    return {
+        fileResults,
+        totalMatches,
+        scannedLines,
+        missingTerms,
+    };
+}
+
+function collectHighlightRanges(text, termTokens, hitIndexes) {
+    const ranges = [];
+
+    hitIndexes.forEach((hitIndex) => {
+        const regex = termTokens[hitIndex].highlightRegex;
+        regex.lastIndex = 0;
+
+        let match;
+        while ((match = regex.exec(text)) !== null) {
+            const start = match.index;
+            const end = start + match[0].length;
+            if (end > start) {
+                ranges.push([start, end]);
+            }
+            if (match.index === regex.lastIndex) {
+                regex.lastIndex += 1;
+            }
+        }
+    });
+
+    if (ranges.length === 0) return ranges;
+
+    ranges.sort((a, b) => a[0] - b[0] || b[1] - a[1]);
+
+    const merged = [ranges[0]];
+    for (let index = 1; index < ranges.length; index += 1) {
+        const current = ranges[index];
+        const previous = merged[merged.length - 1];
+
+        if (current[0] <= previous[1]) {
+            previous[1] = Math.max(previous[1], current[1]);
+            continue;
+        }
+
+        merged.push(current);
+    }
+
+    return merged;
+}
+
+function buildHighlightedHtml(text, termTokens, hitIndexes) {
+    if (hitIndexes.length === 0) {
+        return escapeHtml(text);
+    }
+
+    const ranges = collectHighlightRanges(text, termTokens, hitIndexes);
+    if (ranges.length === 0) {
+        return escapeHtml(text);
+    }
+
+    let cursor = 0;
+    let html = "";
+
+    ranges.forEach(([start, end]) => {
+        html += escapeHtml(text.slice(cursor, start));
+        html += `<mark class="highlight">${escapeHtml(text.slice(start, end))}</mark>`;
+        cursor = end;
+    });
+
+    html += escapeHtml(text.slice(cursor));
+    return html;
+}
+
+function createFileResultCard(fileResult, termTokens, mode) {
+    const card = document.createElement("div");
+    card.className = "file-result";
+
+    const header = document.createElement("div");
+    header.className = "file-header";
+
+    const title = document.createElement("span");
+    title.className = "file-title";
+    title.textContent = fileResult.fileName;
+
+    const matchCount = document.createElement("span");
+    matchCount.className = "match-count";
+    matchCount.textContent = `${formatNumber(fileResult.matches.length)} match${
+        fileResult.matches.length > 1 ? "es" : ""
+    }`;
+
+    const collapseIcon = document.createElement("span");
+    collapseIcon.className = "collapse-icon";
+    collapseIcon.innerHTML = '<i class="fas fa-chevron-down"></i>';
+
+    header.appendChild(title);
+    header.appendChild(matchCount);
+    header.appendChild(collapseIcon);
+
+    const content = document.createElement("div");
+    content.className = "file-content";
+    if (dom.resultsSection.classList.contains("fullscreen")) {
+        content.classList.add("fullscreen");
+    }
+
+    fileResult.matches.forEach((match) => {
+        const entry = document.createElement("div");
+        entry.className = "file-entry";
+
+        const lineNumber = document.createElement("span");
+        lineNumber.className = "entry-line";
+        lineNumber.textContent = `L${match.lineNumber}`;
+
+        const lineText = document.createElement("span");
+        lineText.className = "entry-text";
+
+        if (mode === "not") {
+            lineText.textContent = match.raw;
+        } else {
+            lineText.innerHTML = buildHighlightedHtml(
+                match.raw,
+                termTokens,
+                match.hitIndexes
+            );
+        }
+
+        entry.appendChild(lineNumber);
+        entry.appendChild(lineText);
+        content.appendChild(entry);
+    });
+
+    header.addEventListener("click", () => {
+        const collapsed = content.classList.toggle("collapsed");
+        header.classList.toggle("collapsed", collapsed);
+    });
+
+    card.appendChild(header);
+    card.appendChild(content);
+    return card;
+}
+
+function renderMissingSummary(missingTerms) {
+    const wrapper = document.createElement("div");
+    wrapper.className = "missing-summary";
+
+    const prefix = document.createElement("span");
+    prefix.textContent = "Not found in any file:";
+    wrapper.appendChild(prefix);
+
+    missingTerms.forEach((term) => {
+        const chip = document.createElement("span");
+        chip.className = "missing-term";
+        chip.textContent = term;
+        wrapper.appendChild(chip);
+    });
+
+    return wrapper;
+}
+
+function renderNoResults(terms) {
+    const suffix = terms.length ? `for "${terms.join(", ")}"` : "";
+    dom.resultsContainer.innerHTML = `
+        <div class="empty-state">
+            <i class="fas fa-search"></i>
+            <h3>No Results Found</h3>
+            <p>No matching entries ${suffix}</p>
+        </div>
+    `;
+}
+
+function renderSearchResults(outcome, termTokens, mode, options, runtimeMs) {
+    dom.resultsContainer.innerHTML = "";
+
+    if (outcome.totalMatches === 0) {
+        renderNoResults(termTokens.map((token) => token.raw));
+    } else {
+        const fragment = document.createDocumentFragment();
+
+        outcome.fileResults.forEach((fileResult) => {
+            fragment.appendChild(createFileResultCard(fileResult, termTokens, mode));
+        });
+
+        dom.resultsContainer.appendChild(fragment);
+    }
+
+    if (outcome.missingTerms.length > 0) {
+        dom.resultsContainer.appendChild(renderMissingSummary(outcome.missingTerms));
+    }
+
+    setResultsCount(outcome.totalMatches);
+    setSearchMeta(
+        `Scanned ${formatNumber(outcome.scannedLines)} lines in ${runtimeMs.toFixed(
+            1
+        )} ms`
     );
-    if (files.length === 0) {
-        alert("Please drop only text files (.txt)");
+
+    currentResultSnapshot = {
+        type: "search",
+        mode,
+        options,
+        terms: termTokens.map((token) => token.raw),
+        totalMatches: outcome.totalMatches,
+        fileResults: outcome.fileResults,
+    };
+
+    dom.exportBtn.disabled = outcome.totalMatches === 0;
+}
+
+function showAllData() {
+    if (uploadedFiles.length === 0) {
+        showNoFilesState();
         return;
     }
-    // Simulate file input change event for consistency
-    handleFileUpload({ target: { files } });
-});
+
+    showLoadingState();
+
+    requestAnimationFrame(() => {
+        dom.resultsContainer.innerHTML = "";
+        const fragment = document.createDocumentFragment();
+        let totalLines = 0;
+
+        const snapshotFileResults = [];
+
+        uploadedFiles.forEach((file) => {
+            if (file.lines.length === 0) return;
+
+            const fileResult = {
+                fileName: file.name,
+                matches: file.lines.map((line) => ({
+                    lineNumber: line.lineNumber,
+                    raw: line.raw,
+                    hitIndexes: [],
+                })),
+            };
+
+            snapshotFileResults.push(fileResult);
+            totalLines += fileResult.matches.length;
+
+            fragment.appendChild(createFileResultCard(fileResult, [], "not"));
+        });
+
+        if (totalLines === 0) {
+            dom.resultsContainer.innerHTML = `
+                <div class="empty-state">
+                    <i class="fas fa-file-alt"></i>
+                    <h3>No Data</h3>
+                    <p>Uploaded files contain no searchable lines.</p>
+                </div>
+            `;
+            setResultsCount(0);
+            setSearchMeta("No searchable lines found in uploaded files.");
+            dom.exportBtn.disabled = true;
+            return;
+        }
+
+        dom.resultsContainer.appendChild(fragment);
+        setResultsCount(totalLines);
+        setSearchMeta("Showing all uploaded lines (no active keyword filter).");
+
+        currentResultSnapshot = {
+            type: "all",
+            mode: "all",
+            options: {
+                caseSensitive: false,
+                wholeWord: false,
+            },
+            terms: [],
+            totalMatches: totalLines,
+            fileResults: snapshotFileResults,
+        };
+
+        dom.exportBtn.disabled = false;
+    });
+}
+
+function performSearch(isFullscreen = false) {
+    if (uploadedFiles.length === 0) {
+        alert("Please upload text files first");
+        showNoFilesState();
+        return;
+    }
+
+    const mode = getSearchMode(isFullscreen);
+    const options = getSearchOptions(isFullscreen);
+
+    syncSearchMode(mode);
+    syncSearchOptions(options);
+
+    const cleanedInput = normalizeSearchInput(getActiveInputValue(isFullscreen));
+    const terms = parseSearchTerms(cleanedInput, options.caseSensitive);
+    const normalizedInput = terms.join("\n");
+
+    syncSearchInputs(normalizedInput);
+
+    if (terms.length === 0) {
+        showAllData();
+        return;
+    }
+
+    showLoadingState();
+
+    requestAnimationFrame(() => {
+        const startTime = performance.now();
+        const termTokens = buildTermTokens(terms, options);
+        const outcome = searchFiles(termTokens, mode, options);
+        const runtimeMs = performance.now() - startTime;
+
+        renderSearchResults(outcome, termTokens, mode, options, runtimeMs);
+    });
+}
+
+function updateFileList() {
+    dom.fileList.innerHTML = "";
+
+    if (uploadedFiles.length === 0) {
+        const text = document.createElement("p");
+        text.className = "file-item-detail";
+        text.textContent = "No files uploaded yet";
+        dom.fileList.appendChild(text);
+        return;
+    }
+
+    const header = document.createElement("div");
+    header.className = "file-list-header";
+
+    const title = document.createElement("span");
+    title.textContent = `Uploaded files (${formatNumber(uploadedFiles.length)})`;
+
+    const clearButton = document.createElement("button");
+    clearButton.className = "clear-files-btn";
+    clearButton.type = "button";
+    clearButton.textContent = "Clear All";
+    clearButton.addEventListener("click", clearAllFiles);
+
+    header.appendChild(title);
+    header.appendChild(clearButton);
+    dom.fileList.appendChild(header);
+
+    uploadedFiles.forEach((file) => {
+        const item = document.createElement("div");
+        item.className = "file-item";
+
+        const metadata = document.createElement("div");
+        metadata.className = "file-item-meta";
+
+        const fileName = document.createElement("div");
+        fileName.className = "file-item-name";
+        fileName.textContent = file.name;
+
+        const fileDetail = document.createElement("div");
+        fileDetail.className = "file-item-detail";
+        fileDetail.textContent = `${formatNumber(file.lines.length)} lines • ${formatBytes(
+            file.size
+        )}`;
+
+        metadata.appendChild(fileName);
+        metadata.appendChild(fileDetail);
+
+        const removeButton = document.createElement("button");
+        removeButton.className = "remove-file-btn";
+        removeButton.type = "button";
+        removeButton.title = `Remove ${file.name}`;
+        removeButton.innerHTML = '<i class="fas fa-times"></i>';
+        removeButton.addEventListener("click", () => {
+            uploadedFiles = uploadedFiles.filter((entry) => entry.uniqueKey !== file.uniqueKey);
+            updateFileList();
+            updateQuickStats();
+
+            if (uploadedFiles.length === 0) {
+                syncSearchInputs("");
+                showNoFilesState();
+                return;
+            }
+
+            if (!dom.searchInput.value.trim()) {
+                showAllData();
+                return;
+            }
+
+            performSearch(false);
+        });
+
+        item.appendChild(metadata);
+        item.appendChild(removeButton);
+        dom.fileList.appendChild(item);
+    });
+}
+
+function clearAllFiles() {
+    uploadedFiles = [];
+    updateFileList();
+    updateQuickStats();
+    syncSearchInputs("");
+    showNoFilesState();
+}
+
+async function handleFileUpload(event) {
+    const selectedFiles = Array.from(event.target.files || []);
+    if (selectedFiles.length === 0) return;
+
+    const validFiles = [];
+    const warnings = [];
+
+    selectedFiles.forEach((file) => {
+        if (!isTextFile(file)) {
+            warnings.push(`${file.name} skipped (only .txt is allowed)`);
+            return;
+        }
+
+        if (file.size > MAX_FILE_SIZE_BYTES) {
+            warnings.push(`${file.name} skipped (max size is 10 MB)`);
+            return;
+        }
+
+        validFiles.push(file);
+    });
+
+    if (validFiles.length === 0) {
+        if (warnings.length > 0) {
+            alert(warnings.join("\n"));
+        }
+        dom.fileInput.value = "";
+        return;
+    }
+
+    const readResults = await Promise.all(
+        validFiles.map(async (file) => {
+            const content = await readFileAsText(file);
+            return { file, content };
+        })
+    );
+
+    let addedCount = 0;
+    let duplicateCount = 0;
+
+    readResults.forEach(({ file, content }) => {
+        const record = buildFileRecord(file, content);
+        const exists = uploadedFiles.some(
+            (uploadedFile) => uploadedFile.uniqueKey === record.uniqueKey
+        );
+
+        if (exists) {
+            duplicateCount += 1;
+            return;
+        }
+
+        uploadedFiles.push(record);
+        addedCount += 1;
+    });
+
+    updateFileList();
+    updateQuickStats();
+
+    if (warnings.length > 0 || duplicateCount > 0) {
+        const notices = [...warnings];
+        if (duplicateCount > 0) {
+            notices.push(`${duplicateCount} duplicate file skipped`);
+        }
+        setSearchMeta(notices.join(" • "));
+    }
+
+    if (addedCount > 0) {
+        if (dom.searchInput.value.trim()) {
+            performSearch(false);
+        } else {
+            showAllData();
+        }
+    }
+
+    dom.fileInput.value = "";
+}
+
+function handleSearchEnter(event, isFullscreen) {
+    if (event.key !== "Enter") return;
+
+    if (event.shiftKey) {
+        setTimeout(() => {
+            adjustTextareaHeight(isFullscreen ? dom.fullscreenSearchInput : dom.searchInput);
+        }, 0);
+        return;
+    }
+
+    event.preventDefault();
+    performSearch(isFullscreen);
+}
+
+function exportCurrentResults() {
+    if (!currentResultSnapshot || currentResultSnapshot.totalMatches === 0) {
+        alert("No results available to export");
+        return;
+    }
+
+    const lines = [];
+    lines.push("Multi-File Text Search Export");
+    lines.push(`Generated: ${new Date().toLocaleString()}`);
+    lines.push(`Total Results: ${currentResultSnapshot.totalMatches}`);
+
+    if (currentResultSnapshot.type === "search") {
+        lines.push(`Mode: ${currentResultSnapshot.mode.toUpperCase()}`);
+        lines.push(
+            `Options: caseSensitive=${currentResultSnapshot.options.caseSensitive}, wholeWord=${currentResultSnapshot.options.wholeWord}`
+        );
+        lines.push(
+            `Terms: ${
+                currentResultSnapshot.terms.length > 0
+                    ? currentResultSnapshot.terms.join(" | ")
+                    : "-"
+            }`
+        );
+    } else {
+        lines.push("Mode: SHOW_ALL");
+    }
+
+    lines.push("");
+
+    currentResultSnapshot.fileResults.forEach((fileResult) => {
+        lines.push(`=== ${fileResult.fileName} (${fileResult.matches.length}) ===`);
+        fileResult.matches.forEach((match) => {
+            lines.push(`[L${match.lineNumber}] ${match.raw}`);
+        });
+        lines.push("");
+    });
+
+    const content = lines.join("\n");
+    const blob = new Blob([content], { type: "text/plain;charset=utf-8" });
+    const url = URL.createObjectURL(blob);
+    const anchor = document.createElement("a");
+    const timestamp = new Date()
+        .toISOString()
+        .replace(/[:]/g, "-")
+        .replace(/\..+$/, "");
+
+    anchor.href = url;
+    anchor.download = `search-results-${timestamp}.txt`;
+    document.body.appendChild(anchor);
+    anchor.click();
+    document.body.removeChild(anchor);
+    URL.revokeObjectURL(url);
+}
+
+function toggleFullscreen() {
+    dom.resultsSection.classList.toggle("fullscreen");
+    const isFullscreen = dom.resultsSection.classList.contains("fullscreen");
+
+    if (isFullscreen) {
+        dom.fullscreenBtn.innerHTML = '<i class="fas fa-compress"></i> Exit Full Screen';
+        dom.fullscreenSearchToggleBtn.style.display = "inline-flex";
+        return;
+    }
+
+    dom.fullscreenBtn.innerHTML = '<i class="fas fa-expand"></i> Full Screen';
+    dom.fullscreenSearchToggleBtn.style.display = "none";
+    dom.fullscreenSearchBar.classList.remove("visible");
+}
+
+function setupEventListeners() {
+    dom.uploadButton.addEventListener("click", () => dom.fileInput.click());
+    dom.fileInput.addEventListener("change", handleFileUpload);
+
+    dom.searchButton.addEventListener("click", () => performSearch(false));
+    dom.fullscreenSearchBtn.addEventListener("click", () => performSearch(true));
+
+    dom.clearInputBtn.addEventListener("click", () => {
+        syncSearchInputs("");
+
+        if (uploadedFiles.length === 0) {
+            showNoFilesState();
+            return;
+        }
+
+        showAllData();
+    });
+
+    dom.fullscreenBtn.addEventListener("click", toggleFullscreen);
+
+    dom.fullscreenSearchToggleBtn.addEventListener("click", () => {
+        dom.fullscreenSearchBar.classList.toggle("visible");
+        if (dom.fullscreenSearchBar.classList.contains("visible")) {
+            dom.fullscreenSearchInput.focus();
+        }
+    });
+
+    dom.searchInput.addEventListener("input", () => adjustTextareaHeight(dom.searchInput));
+    dom.fullscreenSearchInput.addEventListener("input", () =>
+        adjustTextareaHeight(dom.fullscreenSearchInput)
+    );
+
+    dom.searchInput.addEventListener("keydown", (event) =>
+        handleSearchEnter(event, false)
+    );
+    dom.fullscreenSearchInput.addEventListener("keydown", (event) =>
+        handleSearchEnter(event, true)
+    );
+
+    document.querySelectorAll('input[name="search-mode"]').forEach((radio) => {
+        radio.addEventListener("change", () => {
+            syncSearchMode(radio.value);
+            if (uploadedFiles.length > 0 && dom.searchInput.value.trim()) {
+                performSearch(false);
+            }
+        });
+    });
+
+    document
+        .querySelectorAll('input[name="fullscreen-search-mode"]')
+        .forEach((radio) => {
+            radio.addEventListener("change", () => {
+                syncSearchMode(radio.value);
+                if (uploadedFiles.length > 0 && dom.searchInput.value.trim()) {
+                    performSearch(true);
+                }
+            });
+        });
+
+    const onOptionChange = (source) => {
+        const options = getSearchOptions(source === "fullscreen");
+        syncSearchOptions(options);
+
+        if (uploadedFiles.length > 0 && dom.searchInput.value.trim()) {
+            performSearch(source === "fullscreen");
+        }
+    };
+
+    dom.caseSensitive.addEventListener("change", () => onOptionChange("main"));
+    dom.wholeWord.addEventListener("change", () => onOptionChange("main"));
+    dom.fullscreenCaseSensitive.addEventListener("change", () =>
+        onOptionChange("fullscreen")
+    );
+    dom.fullscreenWholeWord.addEventListener("change", () =>
+        onOptionChange("fullscreen")
+    );
+
+    dom.exportBtn.addEventListener("click", exportCurrentResults);
+
+    dom.fileUploadArea.addEventListener("dragover", (event) => {
+        event.preventDefault();
+        event.stopPropagation();
+        dom.fileUploadArea.classList.add("dragover");
+    });
+
+    dom.fileUploadArea.addEventListener("dragleave", (event) => {
+        event.preventDefault();
+        event.stopPropagation();
+        dom.fileUploadArea.classList.remove("dragover");
+    });
+
+    dom.fileUploadArea.addEventListener("drop", (event) => {
+        event.preventDefault();
+        event.stopPropagation();
+        dom.fileUploadArea.classList.remove("dragover");
+
+        const files = Array.from(event.dataTransfer.files || []).filter((file) =>
+            isTextFile(file)
+        );
+
+        if (files.length === 0) {
+            alert("Please drop .txt files only");
+            return;
+        }
+
+        handleFileUpload({ target: { files } });
+    });
+
+    document.addEventListener("keydown", (event) => {
+        if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === "k") {
+            event.preventDefault();
+            dom.searchInput.focus();
+        }
+    });
+}
+
+function initialize() {
+    setupEventListeners();
+    updateFileList();
+    updateQuickStats();
+    adjustTextareaHeight(dom.searchInput);
+    adjustTextareaHeight(dom.fullscreenSearchInput);
+    dom.fullscreenSearchToggleBtn.style.display = "none";
+    showNoFilesState();
+}
+
+initialize();
