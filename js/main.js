@@ -337,11 +337,28 @@ function searchFiles(termTokens, mode, options) {
                   .map((token) => token.raw)
             : [];
 
+    // Detect duplicate lines: identical raw text appearing more than once across all results
+    const lineTextCount = new Map();
+    fileResults.forEach((fileResult) => {
+        fileResult.matches.forEach((match) => {
+            const text = match.raw.trim();
+            if (!text) return;
+            lineTextCount.set(text, (lineTextCount.get(text) || 0) + 1);
+        });
+    });
+
+    const duplicateLines = [];
+    lineTextCount.forEach((count, text) => {
+        if (count > 1) duplicateLines.push({ text, count });
+    });
+    duplicateLines.sort((a, b) => b.count - a.count);
+
     return {
         fileResults,
         totalMatches,
         scannedLines,
         missingTerms,
+        duplicateLines,
     };
 }
 
@@ -493,6 +510,37 @@ function renderMissingSummary(missingTerms) {
     return wrapper;
 }
 
+function renderDuplicateSummary(duplicateLines) {
+    const wrapper = document.createElement("div");
+    wrapper.className = "missing-summary duplicate-summary";
+
+    const totalOccurrences = duplicateLines.reduce((sum, d) => sum + d.count, 0);
+    const prefix = document.createElement("span");
+    prefix.textContent = `Duplicate lines (${formatNumber(duplicateLines.length)} unique, ${formatNumber(totalOccurrences)} occurrences):`;
+    wrapper.appendChild(prefix);
+
+    const MAX_CHIPS = 8;
+    const visible = duplicateLines.slice(0, MAX_CHIPS);
+
+    visible.forEach(({ text, count }) => {
+        const chip = document.createElement("span");
+        chip.className = "duplicate-term";
+        const label = text.length > 35 ? text.slice(0, 35) + "…" : text;
+        chip.textContent = `"${label}" ×${count}`;
+        chip.title = text;
+        wrapper.appendChild(chip);
+    });
+
+    if (duplicateLines.length > MAX_CHIPS) {
+        const more = document.createElement("span");
+        more.className = "duplicate-term";
+        more.textContent = `+${formatNumber(duplicateLines.length - MAX_CHIPS)} more`;
+        wrapper.appendChild(more);
+    }
+
+    return wrapper;
+}
+
 function renderNoResults(terms) {
     const suffix = terms.length ? `for "${terms.join(", ")}"` : "";
     dom.resultsContainer.innerHTML = `
@@ -519,6 +567,10 @@ function renderSearchResults(outcome, termTokens, mode, options, runtimeMs) {
         dom.resultsContainer.appendChild(fragment);
     }
 
+    if (outcome.duplicateLines && outcome.duplicateLines.length > 0) {
+        dom.resultsContainer.appendChild(renderDuplicateSummary(outcome.duplicateLines));
+    }
+
     if (outcome.missingTerms.length > 0) {
         dom.resultsContainer.appendChild(renderMissingSummary(outcome.missingTerms));
     }
@@ -537,6 +589,7 @@ function renderSearchResults(outcome, termTokens, mode, options, runtimeMs) {
         terms: termTokens.map((token) => token.raw),
         totalMatches: outcome.totalMatches,
         fileResults: outcome.fileResults,
+        duplicateLines: outcome.duplicateLines || [],
     };
 
     dom.exportBtn.disabled = outcome.totalMatches === 0;
@@ -843,6 +896,15 @@ function exportCurrentResults() {
                     : "-"
             }`
         );
+
+        const dupes = currentResultSnapshot.duplicateLines || [];
+        if (dupes.length > 0) {
+            const totalOcc = dupes.reduce((s, d) => s + d.count, 0);
+            lines.push(`Duplicate Lines: ${dupes.length} unique, ${totalOcc} occurrences`);
+            dupes.forEach(({ text, count }) => {
+                lines.push(`  [×${count}] ${text}`);
+            });
+        }
     } else {
         lines.push("Mode: SHOW_ALL");
     }
