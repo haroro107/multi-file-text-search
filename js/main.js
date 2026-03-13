@@ -337,18 +337,26 @@ function searchFiles(termTokens, mode, options) {
                   .map((token) => token.raw)
             : [];
 
-    // Detect duplicate lines: identical raw text appearing more than once across all results
-    const lineTextCount = new Map();
-    fileResults.forEach((fileResult) => {
-        fileResult.matches.forEach((match) => {
-            const text = match.raw.trim();
-            if (!text) return;
-            lineTextCount.set(text, (lineTextCount.get(text) || 0) + 1);
+    // Detect duplicate: search terms that matched more than one line
+    const termMatchCount = new Map();
+    if (mode !== "not") {
+        fileResults.forEach((fileResult) => {
+            fileResult.matches.forEach((match) => {
+                match.hitIndexes.forEach((hitIndex) => {
+                    const token = termTokens[hitIndex];
+                    const prev = termMatchCount.get(token.key);
+                    if (prev) {
+                        prev.count += 1;
+                    } else {
+                        termMatchCount.set(token.key, { text: token.raw, count: 1 });
+                    }
+                });
+            });
         });
-    });
+    }
 
     const duplicateLines = [];
-    lineTextCount.forEach((count, text) => {
+    termMatchCount.forEach(({ text, count }) => {
         if (count > 1) duplicateLines.push({ text, count });
     });
     duplicateLines.sort((a, b) => b.count - a.count);
@@ -514,9 +522,8 @@ function renderDuplicateSummary(duplicateLines) {
     const wrapper = document.createElement("div");
     wrapper.className = "missing-summary duplicate-summary";
 
-    const totalOccurrences = duplicateLines.reduce((sum, d) => sum + d.count, 0);
     const prefix = document.createElement("span");
-    prefix.textContent = `Duplicate lines (${formatNumber(duplicateLines.length)} unique, ${formatNumber(totalOccurrences)} occurrences):`;
+    prefix.textContent = `Duplicate matches — ${formatNumber(duplicateLines.length)} term${duplicateLines.length > 1 ? "s" : ""} found in multiple lines:`;
     wrapper.appendChild(prefix);
 
     const MAX_CHIPS = 8;
@@ -526,7 +533,7 @@ function renderDuplicateSummary(duplicateLines) {
         const chip = document.createElement("span");
         chip.className = "duplicate-term";
         const label = text.length > 35 ? text.slice(0, 35) + "…" : text;
-        chip.textContent = `"${label}" ×${count}`;
+        chip.textContent = `"${label}" ×${count} lines`;
         chip.title = text;
         wrapper.appendChild(chip);
     });
@@ -899,10 +906,9 @@ function exportCurrentResults() {
 
         const dupes = currentResultSnapshot.duplicateLines || [];
         if (dupes.length > 0) {
-            const totalOcc = dupes.reduce((s, d) => s + d.count, 0);
-            lines.push(`Duplicate Lines: ${dupes.length} unique, ${totalOcc} occurrences`);
+            lines.push(`Duplicate Matches: ${dupes.length} term(s) found in multiple lines`);
             dupes.forEach(({ text, count }) => {
-                lines.push(`  [×${count}] ${text}`);
+                lines.push(`  "${text}" ×${count} lines`);
             });
         }
     } else {
